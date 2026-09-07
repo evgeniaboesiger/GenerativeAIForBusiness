@@ -1,0 +1,10 @@
+node_modules/
+venv/
+__pycache__/
+.env
+.env.local
+.venv
+dist/
+.next/
+/.idea/
+/.vscode/
