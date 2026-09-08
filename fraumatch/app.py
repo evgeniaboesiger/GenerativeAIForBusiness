@@ -26,6 +26,9 @@ from telemetry import summary as telemetry_summary
 # Career Goals & Work Preferences onboarding wizard
 from preferences_ui import show_preferences_page, get_active_preferences
 
+# Candidate assessment: areas to improve (professional + administrative)
+from assessment import RecommendationEngine
+
 # PDF and Word document text extraction
 try:
     from pypdf import PdfReader
@@ -144,7 +147,7 @@ def main():
     page = st.sidebar.radio(
         "Navigate",
         ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Career Goals",
-         "🎯 Job Matching", "📝 Application Agent", "🔐 My Account"]
+         "🎯 Job Matching", "📈 Areas to Improve", "📝 Application Agent", "🔐 My Account"]
     )
     
     # Logout button
@@ -196,6 +199,8 @@ def main():
         show_preferences_page()
     elif page == "🎯 Job Matching":
         show_matching_page(sample_jobs, use_ai)
+    elif page == "📈 Areas to Improve":
+        show_assessment_page(sample_jobs)
     elif page == "📝 Application Agent":
         show_application_page(sample_jobs, use_ai)
     elif page == "🔐 My Account":
@@ -731,7 +736,7 @@ def show_matching_page(sample_jobs, use_ai):
     # Display matches
     if st.session_state.current_matches:
         matches = st.session_state.current_matches
-        show_matches(matches)
+        show_matches(matches, sample_jobs, profile)
     
     # Show matching weights explanation
     with st.expander("📊 How Matching Works"):
@@ -757,15 +762,95 @@ def show_matching_page(sample_jobs, use_ai):
         """)
 
 
-def show_matches(matches):
-    """Display job matches with scores and explanations."""
-    
+def show_assessment_page(sample_jobs):
+    """Full 'Areas to Improve' report: professional + administrative improvements."""
+
+    st.title("📈 Areas to Improve")
+    st.markdown("---")
+
+    if not st.session_state.current_profile:
+        st.warning("⚠️ No candidate profile yet. Please go to **Candidate Profile** page first and extract a profile.")
+        return
+
+    profile = st.session_state.current_profile
+    active_prefs = get_active_preferences()
+
+    st.markdown(
+        "*This assessment compares your profile against your best-fit positions and points "
+        "you to **job-relevant** areas to improve - professional skills and administrative "
+        "details. It does **not** assess your personality or personal worth.*"
+    )
+
+    if active_prefs:
+        profile = {**profile, "preferences": active_prefs}
+
+    st.success(f"Assessment for: **{profile.get('personal_info', {}).get('name', 'Candidate')}**")
+
+    if st.button("🔄 Refresh assessment", type="primary"):
+        pass  # re-run below (Streamlit reruns on button click)
+
+    engine = RecommendationEngine()
+    result = engine.assess(profile, sample_jobs, active_prefs)
+
+    st.markdown("### 🎯 Based on your best-fit roles")
+    top_jobs = result["top_jobs"]
+    if top_jobs:
+        cols = st.columns(min(len(top_jobs), 4))
+        for col, job in zip(cols, top_jobs[:4]):
+            with col:
+                st.metric(job["title"], f"{job['score']}%", help=job["company"])
+    else:
+        st.info("No comparable positions found to assess against.")
+
+    st.markdown("---")
+
+    # Professional improvement areas
+    st.markdown("### 💼 Professional areas to improve")
+    professional = result["professional"]
+    if professional:
+        for item in professional:
+            badge = {"high": "🔴 High", "medium": "🟠 Medium", "low": "🟡 Low"}[item["priority"]]
+            with st.container(border=True):
+                st.markdown(f"**{item['area']}** — `{badge}`")
+                st.caption(item["detail"])
+                st.markdown(f"→ **Suggestion:** {item['action']}")
+                if item.get("source_jobs"):
+                    st.caption(f"Relevant for: {', '.join(item['source_jobs'])}")
+    else:
+        st.info("No professional gaps found - you already cover your best-fit roles well.")
+
+    st.markdown("---")
+
+    # Administrative / profile-setup areas
+    st.markdown("### 🗂️ Administrative & profile areas to improve")
+    admin = result["admin"]
+    if admin:
+        for item in admin:
+            badge = {"high": "🔴 High", "medium": "🟠 Medium", "low": "🟡 Low"}[item["priority"]]
+            with st.container(border=True):
+                st.markdown(f"**{item['area']}** — `{badge}`")
+                st.caption(item["detail"])
+                st.markdown(f"→ **Suggestion:** {item['action']}")
+    else:
+        st.info("Your profile and preferences are complete - nothing to do here.")
+
+
+def show_matches(matches, jobs=None, profile=None):
+    """Display job matches with scores, explanations, and per-job improvement areas."""
+
     st.subheader("Matching Results")
-    
+
+    # Cache one engine per page interaction for per-job improvement hints.
+    if "assessment_engine" not in st.session_state:
+        st.session_state.assessment_engine = RecommendationEngine()
+    engine = st.session_state.assessment_engine
+    active_prefs = get_active_preferences()
+    job_by_id = {j["id"]: j for j in jobs} if jobs else {}
+
     for i, match in enumerate(matches):
         score = match["score"]
         mandatory_met = match["mandatory_met"]
-        
+
         # Determine color based on score
         if score >= 75:
             color = "🟢"
@@ -773,29 +858,29 @@ def show_matches(matches):
             color = "🟡"
         else:
             color = "🟠"
-        
+
         with st.container(border=True):
             col1, col2 = st.columns([3, 1])
-            
+
             with col1:
                 st.markdown(f"### {color} {match['job_title']}")
                 st.markdown(f"**{match['company']}** | {match['location']}")
-                
+
                 # Employment details
                 details = match.get("job_details", {})
                 if details:
                     st.caption(f"⏰ {details.get('employment_type', 'N/A')} | 🌐 {details.get('remote_policy', 'N/A')} | 💰 {details.get('salary_range', 'N/A')}")
-                
+
                 # Mandatory requirement status
                 if mandatory_met:
                     st.success("✅ Meets mandatory requirements")
                 else:
                     st.error("❌ Does NOT meet mandatory requirements")
-            
+
             with col2:
                 st.markdown(f"### {score}%")
                 st.caption("Match Score")
-            
+
             # Score breakdown
             with st.expander("📊 Score Breakdown"):
                 breakdown = match.get("score_breakdown", {})
@@ -818,6 +903,16 @@ def show_matches(matches):
                             st.markdown(f"⚠️ {text}")
                         else:
                             st.markdown(f"ℹ️ {text}")
+
+            # Areas to improve for this specific role (compact version)
+            if profile and match["job_id"] in job_by_id:
+                job = job_by_id[match["job_id"]]
+                short = engine.short_for_job(profile, job, active_prefs)
+                if short:
+                    with st.expander("📈 Areas to improve for this role"):
+                        st.caption("Based only on job-relevant gaps between your profile and this position.")
+                        for line in short:
+                            st.markdown(f"- {line}")
 
             # Explanation (AI-generated)
             if match.get("explanation"):

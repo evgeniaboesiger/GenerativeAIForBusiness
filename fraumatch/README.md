@@ -75,7 +75,7 @@ If you haven't yet, create a GitHub repository:
 
 You must **create an account** or **log in** first (email + password). Your CV and profile are then saved securely to your account for future sessions.
 
-After logging in, the app has **6 pages** in the left sidebar:
+After logging in, the app has **7 pages** in the left sidebar:
 
 | Page | What it does |
 |------|--------------|
@@ -83,6 +83,7 @@ After logging in, the app has **6 pages** in the left sidebar:
 | **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
 | **Career Goals** | Onboarding wizard for explicit work preferences (employment %, salary, location, remote, career goals…) — see below |
 | **Job Matching** | Find matching jobs → ranked results with scores, explanations & preference checks |
+| **Areas to Improve** | A recommendation section based on your assessment: categorized **professional** and **administrative** areas to improve — see below |
 | **Application Agent** | Generate a tailored cover letter & application |
 | **My Account** | View your saved profile & preferences, reload them, see account details |
 
@@ -139,10 +140,33 @@ The UI tells the candidate: *"Your preferences describe the type of work environ
 1. **Dashboard** — Show the project overview and the matching weights (30% skills, 20% experience, etc.)
 2. **Candidate Profile** — Pick "Sophie Müller" → show the extracted profile → click **💾 Save to my account**
 3. **Career Goals** — Fill in the wizard → show the Review & Confirm summary → save → show the ethics note ("preferences, not personality")
-4. **Job Matching** — Click **Find Matching Jobs** → expand **"🎯 Why this job matches your preferences"** to show ✓/⚠ preference checks
+4. **Job Matching** — Click **Find Matching Jobs** → expand **"🎯 Why this job matches your preferences"** to show ✓/⚠ preference checks, and **"📈 Areas to improve for this role"** for the per-job gaps
+5. **Areas to Improve** — Show the categorized professional + administrative recommendations (3.5% → "you have strong preferences, but need skills X and Y for your top role")
 5. **My Account** — Show the saved profile *and preferences* were stored, then **Load my saved profile**
 6. **Application Agent** — Select a job → generate a cover letter → check the approval step
 7. **Dashboard → Matching Efficiency Experiment** — show Version A vs Version B telemetry
+
+---
+
+## 📈 Areas to Improve (Assessment & Recommendations)
+
+The **Areas to Improve** page turns the candidate's assessment into **actionable, job-relevant recommendations** — split into two categories so the user can work on skills and on practical/admin setup separately:
+
+| Category | What it contains |
+|----------|------------------|
+| **💼 Professional areas** | Gaps between the candidate's profile and their **best-fit positions**: missing required skills, language proficiency below the role's requirement (e.g. German B1 → C1), fewer experience years than required, education-level gaps, and optional "nice-to-have" credentials |
+| **🗂️ Administrative & profile areas** | Profile completeness (contact info, summary, skills, work history, education, languages), setup of Career Goals & Preferences, and an optional hint about administrative skills **when the candidate's top roles are administrative** (e.g. coordinator/office roles) |
+
+Every recommendation has a **priority** (🔴 High / 🟠 Medium / 🟡 Low) and a concrete **suggestion**. In **Job Matching**, each result also shows a compact **"📈 Areas to improve for this role"** expander (max 3 items) so the candidate knows right next to a match what would make them stronger for *that* job.
+
+**How it works**
+
+- The engine first ranks the candidate against the job pool (fast deterministic mode — no AI needed for the recommendations themselves), then derives gaps **only from the structured job data** (requirements, `skills_required`, generated language expectations) and the candidate's own profile
+- Missing/unknown values are **neutral, never penalized**
+- Career breaks are **not** penalized (the report explicitly says so in the work-history tip)
+- Duplicate gaps are merged across jobs and list which roles they matter for
+
+**Ethics (same contract as the rest of the app):** recommendations are job-relevant only. There is **no** personality, culture-fit, loyalty, retention, motivation or psychological assessment language, and no protected characteristics are used.
 
 ---
 
@@ -173,7 +197,7 @@ The preference model, matching rules and ethical safeguards are covered by a tes
 python -m pytest tests/ -q
 ```
 
-Run from the `matcha` folder. Tests cover employment %, salary (incl. flexible), remote/reference points, commute, location, career goals, work values, working-language preference, missing preferences, preference changes, and the ethical rules (no personality traits, no protected characteristics, no career-break penalty).
+Run from the `matcha` folder. Tests cover the preference model & matching rules, the ethical safeguards, **and the assessment/recommendation engine** (professional gap detection, language/experience gaps, admin & profile-completeness items, deduplication across jobs, priority ordering, and the ethical rules — no personality traits, no protected characteristics, no career-break penalty).
 
 ---
 
@@ -188,6 +212,7 @@ matcha/
 │   ├── matching_agent.py     # Agent 2: Deterministic Job Matching
 │   ├── application_agent.py  # Agent 3: Tailored Applications
 │   ├── preferences.py        # Structured preference model + compatibility rules
+│   ├── assessment.py         # Areas-to-improve engine (professional + admin categories)
 │   ├── telemetry.py          # Anonymized A/B matching-efficiency logging
 │   └── db.py                 # Secure accounts + encrypted profile & preference storage
 ├── data/
@@ -195,7 +220,8 @@ matcha/
 │   ├── sample_jobs.json      # Demo job listings (with structured attributes)
 │   └── match_telemetry.jsonl # Generated at runtime (git-ignored)
 ├── tests/
-│   └── test_preferences.py   # Automated tests (49 cases)
+│   ├── test_preferences.py   # Automated tests (49 cases)
+│   └── test_assessment.py    # Assessment engine tests (15 cases)
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
