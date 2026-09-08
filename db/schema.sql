@@ -121,6 +121,29 @@ CREATE TABLE agent_logs (
   error TEXT
 );
 
+CREATE TABLE profile_extractions (
+  id SERIAL PRIMARY KEY,
+  candidate_id INTEGER REFERENCES candidates(id),
+  source TEXT,
+  raw_text TEXT,
+  profile_json JSONB,
+  model_name TEXT,
+  execution_time_ms INTEGER,
+  token_estimate INTEGER,
+  estimated_cost NUMERIC(10,6),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
+CREATE TABLE profile_reviews (
+  id SERIAL PRIMARY KEY,
+  candidate_id INTEGER NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+  profile_json JSONB,
+  review_status TEXT DEFAULT 'candidate_confirmed',
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+);
+
 -- Applications
 CREATE TABLE applications (
   id SERIAL PRIMARY KEY,

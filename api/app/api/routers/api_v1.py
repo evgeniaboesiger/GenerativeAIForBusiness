@@ -7,8 +7,12 @@ from app.db.models import MatchingLog
 from app.orchestrator import service as orchestrator_service
 from app.orchestrator import schemas as orchestrator_schemas
 from app.db.models import Workflow, AgentLog
+from app.profile.agent import ProfileAgent
+from app.profile.schemas import ProfileExtractionRequest, ProfileReviewUpdate
 
 router = APIRouter()
+PROFILE_AGENT = ProfileAgent(model_name="demo-profile-agent")
+PROFILE_AGENT = ProfileAgent(model_name="demo-profile-agent")
 
 
 def get_db():
@@ -17,6 +21,53 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@router.post("/api/profile/extract")
+def extract_profile(payload: ProfileExtractionRequest, db: Session = Depends(get_db)):
+    result = PROFILE_AGENT.extract_profile(payload.cv_text)
+    if payload.candidate_id is not None:
+        extraction = models.ProfileExtraction(
+            candidate_id=payload.candidate_id,
+            source=payload.source,
+            raw_text=payload.cv_text,
+            profile_json=result.model_dump(),
+            model_name=result.audit.model_used,
+            execution_time_ms=result.audit.execution_time_ms,
+            token_estimate=result.audit.token_estimate,
+            estimated_cost=result.audit.estimated_cost,
+        )
+        db.add(extraction)
+        db.commit()
+    return result.model_dump()
+
+
+@router.get("/api/profile/candidate/{candidate_id}")
+def get_candidate_profile(candidate_id: int, db: Session = Depends(get_db)):
+    extraction = db.query(models.ProfileExtraction).filter(models.ProfileExtraction.candidate_id == candidate_id).order_by(models.ProfileExtraction.created_at.desc()).first()
+    if not extraction:
+        raise HTTPException(status_code=404, detail="Profile extraction not found")
+    return extraction.profile_json
+
+
+@router.post("/api/profile/candidate/{candidate_id}/review")
+def review_candidate_profile(candidate_id: int, payload: ProfileReviewUpdate, db: Session = Depends(get_db)):
+    if payload.candidate_id != candidate_id:
+        raise HTTPException(status_code=400, detail="Candidate id mismatch")
+
+    review = models.ProfileReview(
+        candidate_id=candidate_id,
+        profile_json=payload.profile.model_dump(),
+        review_status=payload.review_status,
+        notes=payload.notes,
+    )
+    db.add(review)
+    db.commit()
+    return {
+        "candidate_id": candidate_id,
+        "review_status": payload.review_status,
+        "profile": payload.profile.model_dump(),
+    }
 
 
 @router.get("/api/candidates")

@@ -35,6 +35,31 @@ class Candidate(Base):
     education = relationship('Education', back_populates='candidate', cascade='all, delete')
 
 
+class ProfileExtraction(Base):
+    __tablename__ = 'profile_extractions'
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey('candidates.id'), nullable=True)
+    source = Column(String, default='cv')
+    raw_text = Column(Text)
+    profile_json = Column(JSONType)
+    model_name = Column(String)
+    execution_time_ms = Column(Integer)
+    token_estimate = Column(Integer)
+    estimated_cost = Column(Numeric(10, 6))
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class ProfileReview(Base):
+    __tablename__ = 'profile_reviews'
+    id = Column(Integer, primary_key=True, index=True)
+    candidate_id = Column(Integer, ForeignKey('candidates.id'), nullable=False)
+    profile_json = Column(JSONType)
+    review_status = Column(String, default='candidate_confirmed')
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 class Experience(Base):
     __tablename__ = 'experience'
     id = Column(Integer, primary_key=True, index=True)

@@ -1,0 +1,210 @@
+[
+  {
+    "id": "job_001",
+    "title": "Marketing Manager Digital",
+    "company": "Basel Pharma AG",
+    "location": "Basel",
+    "description": "We are looking for an experienced Digital Marketing Manager to lead our online marketing efforts. You will manage campaigns across multiple channels and lead a small team.",
+    "requirements": {
+      "mandatory": [
+        "5+ years marketing experience",
+        "German native or C1",
+        "Experience in healthcare/pharma industry"
+      ],
+      "nice_to_have": [
+        "Team leadership experience",
+        "Budget management",
+        "Google Analytics certified"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (100%)",
+      "salary_range": "CHF 110,000 - 130,000",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Digital Marketing", "Brand Management", "SEO/SEM", "Google Analytics", "Team Leadership", "Project Management"]
+  },
+  {
+    "id": "job_002",
+    "title": "Marketing Coordinator Part-Time",
+    "company": "Schweizer Gesundheit AG",
+    "location": "Basel",
+    "description": "Looking for a part-time marketing coordinator to support our health awareness campaigns. Perfect for someone returning to the workforce.",
+    "requirements": {
+      "mandatory": [
+        "3+ years marketing experience",
+        "German fluent",
+        "Social media experience"
+      ],
+      "nice_to_have": [
+        "Healthcare sector experience",
+        "Content creation skills"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60%)",
+      "salary_range": "CHF 55,000 - 65,000 (pro-rated)",
+      "remote_policy": "Hybrid (3 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Digital Marketing", "Social Media", "Content Creation", "Adobe Creative Suite"]
+  },
+  {
+    "id": "job_003",
+    "title": "Senior Software Engineer",
+    "company": "Fintech Startup Zurich",
+    "location": "Zurich",
+    "description": "Join our growing fintech startup as a Senior Software Engineer. Work on cutting-edge payment solutions with a modern tech stack.",
+    "requirements": {
+      "mandatory": [
+        "4+ years software development",
+        "Experience with React and Node.js",
+        "English fluent"
+      ],
+      "nice_to_have": [
+        "Fintech experience",
+        "AWS experience",
+        "Team leadership"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (100%)",
+      "salary_range": "CHF 120,000 - 140,000",
+      "remote_policy": "Fully Remote",
+      "start_date": "Flexible"
+    },
+    "skills_required": ["JavaScript", "TypeScript", "React", "Node.js", "PostgreSQL", "AWS"]
+  },
+  {
+    "id": "job_004",
+    "title": "Backend Developer",
+    "company": "Swiss Digital Solutions",
+    "location": "Zurich",
+    "description": "We need a backend developer to build scalable APIs and microservices. Great opportunity for growth in a supportive team.",
+    "requirements": {
+      "mandatory": [
+        "3+ years backend development",
+        "Python or Node.js experience",
+        "Database management experience"
+      ],
+      "nice_to_have": [
+        "Docker experience",
+        "CI/CD knowledge",
+        "Agile methodology"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 95,000 - 115,000",
+      "remote_policy": "Remote (occasional office)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Python", "Node.js", "PostgreSQL", "MongoDB", "Docker", "Git"]
+  },
+  {
+    "id": "job_005",
+    "title": "HR Business Partner",
+    "company": "International Organization Geneva",
+    "location": "Geneva",
+    "description": "Join our HR team supporting international staff. Multilingual environment with focus on employee development and relations.",
+    "requirements": {
+      "mandatory": [
+        "5+ years HR experience",
+        "French and English fluent",
+        "Recruitment experience"
+      ],
+      "nice_to_have": [
+        "International organization experience",
+        "German or Italian",
+        "HRIS system knowledge"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (100%)",
+      "salary_range": "CHF 95,000 - 115,000",
+      "remote_policy": "Office-based",
+      "start_date": "Within 2 months"
+    },
+    "skills_required": ["Recruitment", "Employee Relations", "Swiss Labor Law", "Performance Management", "Training & Development"]
+  },
+  {
+    "id": "job_006",
+    "title": "HR Assistant Part-Time",
+    "company": "Banque Cantonale de Genève",
+    "location": "Geneva",
+    "description": "Part-time HR assistant role perfect for returning professionals. Support recruitment and employee administration.",
+    "requirements": {
+      "mandatory": [
+        "2+ years HR experience",
+        "French fluent",
+        "Administrative skills"
+      ],
+      "nice_to_have": [
+        "Banking sector experience",
+        "HRIS knowledge",
+        "Italian speaker"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (50-60%)",
+      "salary_range": "CHF 45,000 - 55,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Recruitment", "Employee Relations", "Administrative Support", "HRIS Systems"]
+  },
+  {
+    "id": "job_007",
+    "title": "Financial Analyst",
+    "company": "UBS Wealth Management",
+    "location": "Bern",
+    "description": "Analyze financial data and prepare reports for wealth management clients. Strong analytical skills required.",
+    "requirements": {
+      "mandatory": [
+        "3+ years financial analysis",
+        "Advanced Excel skills",
+        "German and English fluent"
+      ],
+      "nice_to_have": [
+        "SAP experience",
+        "Power BI",
+        "IFRS knowledge",
+        "Banking experience"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 90,000 - 110,000",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Financial Analysis", "Excel", "SAP", "Power BI", "IFRS", "Accounting"]
+  },
+  {
+    "id": "job_008",
+    "title": "Junior Accountant",
+    "company": "Mittelständisches Unternehmen Bern",
+    "location": "Bern",
+    "description": "Entry-level accounting position with mentorship opportunities. Great for someone re-entering the finance field.",
+    "requirements": {
+      "mandatory": [
+        "Basic accounting knowledge",
+        "German fluent",
+        "Excel proficiency"
+      ],
+      "nice_to_have": [
+        "SAP experience",
+        "Audit experience",
+        "Tax knowledge"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 60,000 - 75,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Flexible"
+    },
+    "skills_required": ["Accounting", "Excel", "Financial Reporting", "Taxation"]
+  }
+]
