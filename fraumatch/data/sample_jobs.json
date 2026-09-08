@@ -302,5 +302,753 @@
     "working_languages": ["German"],
     "company_size": "medium",
     "work_values": {"learning": 4, "work_life_balance": 4, "job_stability": 3, "career_development": 3}
+  },
+  {
+    "id": "job_009",
+    "title": "Medizinische Praxisassistentin (MPA)",
+    "company": "Praxis Dr. med. Berger & Partner",
+    "location": "Basel",
+    "description": "Wir suchen eine erfahrene Medizinische Praxisassistentin für unsere Hausarztpraxis in Basel. Flexible Arbeitszeiten, familiäres Team und 60-80% Pensum - ideal für Wiedereinsteigerinnen mit Praxisroutine im Gesundheitswesen.",
+    "requirements": {
+      "mandatory": [
+        "2+ years medical or office administration",
+        "German fluent",
+        "Medical terminology knowledge"
+      ],
+      "nice_to_have": [
+        "Tarmed invoicing experience",
+        "Swiss health system knowledge"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 62,000 - 75,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Medical Administration", "Appointment Scheduling", "Patient Communication", "Medical Terminology", "Office Software"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 62000,
+    "salary_max": 75000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "small",
+    "work_values": {"work_life_balance": 5, "social_impact": 4, "teamwork": 4}
+  },
+  {
+    "id": "job_010",
+    "title": "Registered Nurse (Dipl. Pflegefachfrau)",
+    "company": "Kantonsspital Basel",
+    "location": "Basel",
+    "description": "Part-time nursing role in a supportive hospital team with flexible shift planning and a strong focus on work-life balance. Great for experienced nurses returning to practice.",
+    "requirements": {
+      "mandatory": [
+        "2+ years nursing experience",
+        "German native or C1",
+        "Nursing diploma (HF/FH)"
+      ],
+      "nice_to_have": [
+        "Geriatric care experience",
+        "Post-operative care",
+        "Flexible shift availability"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (50-80%)",
+      "salary_range": "CHF 68,000 - 82,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Nursing Care", "Medication Administration", "Care Documentation", "Patient Hygiene", "Wound Management"],
+    "employment_pct_min": 50,
+    "employment_pct_max": 80,
+    "salary_min": 68000,
+    "salary_max": 82000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 20,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"work_life_balance": 5, "social_impact": 5, "teamwork": 4, "job_stability": 4}
+  },
+  {
+    "id": "job_011",
+    "title": "Early Childhood Educator (Kita-Fachperson)",
+    "company": "Stadt Bern, Kitas Bern",
+    "location": "Bern",
+    "description": "Educate and care for children in a public daycare with stable employment, regular pedagogical training and family-friendly schedules.",
+    "requirements": {
+      "mandatory": [
+        "3+ years childcare experience",
+        "German fluent",
+        "Pedagogical training (FA/Praxisanerkennung)"
+      ],
+      "nice_to_have": [
+        "Montessori or Reggio training",
+        "Special needs support",
+        "Music or art skills"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-100%)",
+      "salary_range": "CHF 58,000 - 70,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Childcare", "Educational Play", "Parent Communication", "Group Management", "First Aid"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 100,
+    "salary_min": 58000,
+    "salary_max": 70000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"social_impact": 5, "teamwork": 4, "job_stability": 5}
+  },
+  {
+    "id": "job_012",
+    "title": "Office Manager (50%)",
+    "company": "Zürcher Treuhand & Verwaltung AG",
+    "location": "Zurich",
+    "description": "Independent office management for a mid-sized accounting firm: organization, scheduling and administrative support with flexible part-time hours.",
+    "requirements": {
+      "mandatory": [
+        "3+ years office administration",
+        "German fluent"
+      ],
+      "nice_to_have": [
+        "English B2",
+        "Event coordination",
+        "Service desk experience"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (50%)",
+      "salary_range": "CHF 55,000 - 65,000 (pro-rated)",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Office Administration", "Microsoft 365", "Meeting Coordination", "Travel Management", "Expense Reports"],
+    "employment_pct_min": 50,
+    "employment_pct_max": 50,
+    "salary_min": 55000,
+    "salary_max": 65000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 20,
+    "working_languages": ["German", "English"],
+    "company_size": "small",
+    "work_values": {"work_life_balance": 5, "autonomy": 4, "teamwork": 3}
+  },
+  {
+    "id": "job_013",
+    "title": "Team Assistant (Teamassistentin, 60-80%)",
+    "company": "Kantonale Verwaltung Bern",
+    "location": "Bern",
+    "description": "Administrative support for a cantonal department, with structured onboarding, stable public-sector conditions and flexible part-time models.",
+    "requirements": {
+      "mandatory": [
+        "2+ years secretarial or administration experience",
+        "German native or C1"
+      ],
+      "nice_to_have": [
+        "English B2",
+        "Document management",
+        "Legal administration"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 60,000 - 72,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Executive Support", "Calendar Management", "Document Management", "Microsoft Office", "Citizen Services"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 60000,
+    "salary_max": 72000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 20,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"job_stability": 5, "work_life_balance": 4, "teamwork": 3}
+  },
+  {
+    "id": "job_014",
+    "title": "Payroll Specialist (Lohnbuchhaltung, 60-100%)",
+    "company": "Swiss HR Services AG",
+    "location": "Zurich",
+    "description": "Process Swiss payroll for SME clients in a specialised service company. Flexible part-time models and structured training in Swiss salary law.",
+    "requirements": {
+      "mandatory": [
+        "3+ years payroll experience",
+        "German native or C1",
+        "Knowledge of Swiss social insurance (AHV/IV)"
+      ],
+      "nice_to_have": [
+        "French B2",
+        "SAP HR",
+        "HRIS systems"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-100%)",
+      "salary_range": "CHF 75,000 - 90,000",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Payroll Processing", "Swiss Labor Law", "Social Insurance", "Excel", "HRIS Systems"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 100,
+    "salary_min": 75000,
+    "salary_max": 90000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 25,
+    "working_languages": ["German"],
+    "company_size": "medium",
+    "work_values": {"job_stability": 4, "learning": 4, "work_life_balance": 4}
+  },
+  {
+    "id": "job_015",
+    "title": "Talent Acquisition Specialist (60-80%)",
+    "company": "Canton de Genève - RH",
+    "location": "Geneva",
+    "description": "Recruit multilingual talent for an international public organisation. Multilingual, purpose-driven environment with flexible part-time models.",
+    "requirements": {
+      "mandatory": [
+        "3+ years recruiting experience",
+        "French fluent",
+        "English fluent"
+      ],
+      "nice_to_have": [
+        "International organisation experience",
+        "LinkedIn Recruiter",
+        "German B2"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 80,000 - 92,000 (pro-rated)",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Recruitment", "Sourcing", "Structured Interviewing", "Employer Branding", "HRIS Systems"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 80000,
+    "salary_max": 92000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 15,
+    "working_languages": ["French", "English"],
+    "company_size": "large",
+    "work_values": {"international_environment": 5, "social_impact": 4, "work_life_balance": 4}
+  },
+  {
+    "id": "job_016",
+    "title": "Accountant (Buchhalterin, 60-80%)",
+    "company": "Treuhandbüro Basel",
+    "location": "Basel",
+    "description": "Independent bookkeeping for SMEs - salaries, VAT and annual accounts - in a friendly small team with flexible part-time options.",
+    "requirements": {
+      "mandatory": [
+        "3+ years accounting experience",
+        "German fluent"
+      ],
+      "nice_to_have": [
+        "Swiss VAT (MWST)",
+        "ABACUS accounting software",
+        "Audit experience"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 68,000 - 80,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Accounting", "Financial Reporting", "Swiss VAT", "ABACUS", "Excel"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 68000,
+    "salary_max": 80000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "small",
+    "work_values": {"work_life_balance": 4, "autonomy": 4, "job_stability": 4}
+  },
+  {
+    "id": "job_017",
+    "title": "Senior Financial Controller (80-100%)",
+    "company": "Pharma Prod AG",
+    "location": "Zug",
+    "description": "Lead financial controlling for a manufacturing site - budgets, forecasts and management reporting - with flexible scheduling.",
+    "requirements": {
+      "mandatory": [
+        "5+ years controlling or FP&A experience",
+        "German and English fluent"
+      ],
+      "nice_to_have": [
+        "SAP CO",
+        "IFRS consolidation",
+        "Big-4 background"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 110,000 - 130,000",
+      "remote_policy": "Hybrid (3 days remote)",
+      "start_date": "Within 2 months"
+    },
+    "skills_required": ["Financial Controlling", "Budgeting", "Forecasting", "Consolidation", "IFRS", "SAP"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 110000,
+    "salary_max": 130000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 60,
+    "work_arrangement": "mostly_remote",
+    "commute_minutes": 20,
+    "working_languages": ["German", "English"],
+    "company_size": "large",
+    "work_values": {"career_development": 5, "job_stability": 4, "autonomy": 4}
+  },
+  {
+    "id": "job_018",
+    "title": "Communication Specialist (40-60%)",
+    "company": "Bundesverwaltung Bern",
+    "location": "Bern",
+    "description": "Internal and external communication for a federal office, with flexible part-time and remote options in a stable public-sector environment.",
+    "requirements": {
+      "mandatory": [
+        "3+ years communications experience",
+        "German native or C1"
+      ],
+      "nice_to_have": [
+        "French B2",
+        "Public-sector experience",
+        "Crisis communication"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (40-60%)",
+      "salary_range": "CHF 70,000 - 85,000 (pro-rated)",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Internal Communication", "Content Writing", "Press Relations", "Stakeholder Management", "Adobe Creative Suite"],
+    "employment_pct_min": 40,
+    "employment_pct_max": 60,
+    "salary_min": 70000,
+    "salary_max": 85000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"social_impact": 4, "job_stability": 5, "work_life_balance": 4}
+  },
+  {
+    "id": "job_019",
+    "title": "Social Media & Community Manager (60%)",
+    "company": "Geneva NGO Alliance",
+    "location": "Geneva",
+    "description": "Run social channels for an international NGO - campaigns, community and impact stories - with remote-friendly part-time hours.",
+    "requirements": {
+      "mandatory": [
+        "2+ years social media experience",
+        "French fluent",
+        "English fluent"
+      ],
+      "nice_to_have": [
+        "German B2",
+        "Graphic design (Canva)",
+        "NGO sector experience"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60%)",
+      "salary_range": "CHF 60,000 - 72,000 (pro-rated)",
+      "remote_policy": "Remote-friendly (60% remote)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Social Media", "Community Management", "Content Creation", "Canva", "Analytics"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 60,
+    "salary_min": 60000,
+    "salary_max": 72000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 60,
+    "work_arrangement": "mostly_remote",
+    "commute_minutes": 10,
+    "working_languages": ["French", "English"],
+    "company_size": "medium",
+    "work_values": {"social_impact": 5, "international_environment": 5, "autonomy": 4}
+  },
+  {
+    "id": "job_020",
+    "title": "Data Analyst (80-100%)",
+    "company": "Digitale Dienste AG",
+    "location": "Zurich",
+    "description": "Turn business data into dashboards and insights for retail and finance clients. Agile team, structured learning and a flexible hybrid model.",
+    "requirements": {
+      "mandatory": [
+        "3+ years data analysis experience",
+        "English fluent",
+        "SQL experience"
+      ],
+      "nice_to_have": [
+        "German B2",
+        "Tableau",
+        "A/B testing"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 95,000 - 115,000",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["SQL", "Python", "Data Visualization", "Power BI", "Statistics"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 95000,
+    "salary_max": 115000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 25,
+    "working_languages": ["English", "German"],
+    "company_size": "medium",
+    "work_values": {"learning": 5, "innovation": 4, "teamwork": 4}
+  },
+  {
+    "id": "job_021",
+    "title": "Frontend Engineer (80-100%)",
+    "company": "Webwerk St. Gallen",
+    "location": "St. Gallen",
+    "description": "Build responsive web apps with a modern stack in a product team. Remote-friendly with flexible hours for family scheduling.",
+    "requirements": {
+      "mandatory": [
+        "3+ years frontend development",
+        "English fluent",
+        "React experience"
+      ],
+      "nice_to_have": [
+        "German B2",
+        "Design systems",
+        "Vue.js"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 90,000 - 110,000",
+      "remote_policy": "Remote (3 days / week)",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["JavaScript", "TypeScript", "React", "CSS", "Jest"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 90000,
+    "salary_max": 110000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 60,
+    "work_arrangement": "mostly_remote",
+    "commute_minutes": 30,
+    "working_languages": ["English", "German"],
+    "company_size": "medium",
+    "work_values": {"learning": 4, "work_life_balance": 4, "innovation": 4}
+  },
+  {
+    "id": "job_022",
+    "title": "DevOps Engineer (100%, Full Remote)",
+    "company": "Cloud Solutions AG",
+    "location": "Zurich",
+    "description": "Own CI/CD and infrastructure for a growing product. Fully remote within Switzerland, with regular team days and a strong learning culture.",
+    "requirements": {
+      "mandatory": [
+        "3+ years DevOps or SRE experience",
+        "English fluent"
+      ],
+      "nice_to_have": [
+        "German B1",
+        "Kubernetes certification",
+        "Fintech experience"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (100%)",
+      "salary_range": "CHF 110,000 - 130,000",
+      "remote_policy": "Fully Remote",
+      "start_date": "Flexible"
+    },
+    "skills_required": ["AWS", "Docker", "Kubernetes", "Terraform", "CI/CD", "Linux"],
+    "employment_pct_min": 100,
+    "employment_pct_max": 100,
+    "salary_min": 110000,
+    "salary_max": 130000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 100,
+    "work_arrangement": "fully_remote",
+    "commute_minutes": 0,
+    "working_languages": ["English"],
+    "company_size": "startup",
+    "work_values": {"innovation": 5, "autonomy": 5, "learning": 4}
+  },
+  {
+    "id": "job_023",
+    "title": "Store Manager (Filialleitung, 80-100%)",
+    "company": "Schweizer Einzelhandel AG",
+    "location": "Basel",
+    "description": "Lead a neighbourhood store - team, sales targets and customer experience - with a stable retail employer and family-friendly schedules.",
+    "requirements": {
+      "mandatory": [
+        "4+ years retail leadership experience",
+        "German native or C1"
+      ],
+      "nice_to_have": [
+        "Sales targets",
+        "Inventory management systems",
+        "Apprenticeship trainer (EFA)"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 82,000 - 95,000",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Retail Management", "Sales", "Team Leadership", "Inventory Management", "Customer Service"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 82000,
+    "salary_max": 95000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"teamwork": 4, "job_stability": 4, "autonomy": 4}
+  },
+  {
+    "id": "job_024",
+    "title": "Sales Associate Part-Time (Verkäuferin, 40-60%)",
+    "company": "Modehaus Basel AG",
+    "location": "Basel",
+    "description": "Advise customers and manage the shop floor in a fashion boutique. Flexible part-time hours, including weekends by agreement.",
+    "requirements": {
+      "mandatory": [
+        "Customer service experience",
+        "German fluent"
+      ],
+      "nice_to_have": [
+        "English B1",
+        "Fashion retail knowledge",
+        "Cashiering"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (40-60%)",
+      "salary_range": "CHF 45,000 - 55,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Flexible"
+    },
+    "skills_required": ["Customer Service", "Sales", "Cashiering", "Visual Merchandising", "Product Knowledge"],
+    "employment_pct_min": 40,
+    "employment_pct_max": 60,
+    "salary_min": 45000,
+    "salary_max": 55000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 10,
+    "working_languages": ["German"],
+    "company_size": "small",
+    "work_values": {"teamwork": 3, "work_life_balance": 4, "job_stability": 3}
+  },
+  {
+    "id": "job_025",
+    "title": "Project Manager (Projektleitung, 80-100%)",
+    "company": "Ingenieurbüro Bern AG",
+    "location": "Bern",
+    "description": "Coordinate cross-functional projects in the public-infrastructure sector: planning, budgets and stakeholder communication.",
+    "requirements": {
+      "mandatory": [
+        "4+ years project management experience",
+        "German and English fluent"
+      ],
+      "nice_to_have": [
+        "PMP or Prince2 certification",
+        "Risk management",
+        "Public-sector bids"
+      ]
+    },
+    "details": {
+      "employment_type": "Full-time (80-100%)",
+      "salary_range": "CHF 100,000 - 120,000",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Project Management", "Agile", "Stakeholder Management", "Budget Management", "Microsoft Project", "Risk Management"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 100000,
+    "salary_max": 120000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 20,
+    "working_languages": ["German", "English"],
+    "company_size": "medium",
+    "work_values": {"career_development": 5, "teamwork": 4, "autonomy": 4}
+  },
+  {
+    "id": "job_026",
+    "title": "Quality & Process Manager (60-80%)",
+    "company": "Medtech Basel GmbH",
+    "location": "Basel",
+    "description": "Improve processes and run quality audits in a medical technology company. Structured environment and flexible part-time options.",
+    "requirements": {
+      "mandatory": [
+        "3+ years quality or process management experience",
+        "German fluent",
+        "Audit experience"
+      ],
+      "nice_to_have": [
+        "Six Sigma Green Belt",
+        "ISO 9001 knowledge",
+        "English fluent"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 85,000 - 100,000 (pro-rated)",
+      "remote_policy": "Hybrid (2 days remote)",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Process Management", "Lean", "Quality Audits", "ISO 9001", "Documentation"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 85000,
+    "salary_max": 100000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 25,
+    "working_languages": ["German", "English"],
+    "company_size": "medium",
+    "work_values": {"job_stability": 4, "learning": 4, "career_development": 4}
+  },
+  {
+    "id": "job_027",
+    "title": "Logistics Specialist (Logistik-Sachbearbeiterin, 60-80%)",
+    "company": "Transport & Logistik Schweiz AG",
+    "location": "Olten",
+    "description": "Coordinate freight, stock and customer orders for a national logistics provider. Clear processes, part-time models and a collegial team.",
+    "requirements": {
+      "mandatory": [
+        "2+ years logistics or supply chain experience",
+        "German fluent"
+      ],
+      "nice_to_have": [
+        "French B1",
+        "SAP SD",
+        "Dangerous goods (ADR)"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (60-80%)",
+      "salary_range": "CHF 62,000 - 75,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Immediately"
+    },
+    "skills_required": ["Logistics", "Inventory Management", "Freight Coordination", "SAP", "Customer Support"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 62000,
+    "salary_max": 75000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 20,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"teamwork": 4, "job_stability": 4, "work_life_balance": 4}
+  },
+  {
+    "id": "job_028",
+    "title": "Municipal Administration Clerk (Verwaltungsmitarbeiterin, 50-80%)",
+    "company": "Einwohnergemeinde Bern",
+    "location": "Bern",
+    "description": "Citizen services and administrative support in a municipal office: permits, registry and correspondence, with stable public-sector conditions.",
+    "requirements": {
+      "mandatory": [
+        "2+ years public or office administration experience",
+        "German native or C1"
+      ],
+      "nice_to_have": [
+        "French B1",
+        "Cantonal law basics",
+        "Archives and document management"
+      ]
+    },
+    "details": {
+      "employment_type": "Part-time (50-80%)",
+      "salary_range": "CHF 58,000 - 70,000 (pro-rated)",
+      "remote_policy": "Office-based",
+      "start_date": "Within 1 month"
+    },
+    "skills_required": ["Administrative Support", "Citizen Services", "Document Management", "Microsoft Office", "Correspondence"],
+    "employment_pct_min": 50,
+    "employment_pct_max": 80,
+    "salary_min": 58000,
+    "salary_max": 70000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "large",
+    "work_values": {"job_stability": 5, "social_impact": 4, "work_life_balance": 4}
   }
 ]
