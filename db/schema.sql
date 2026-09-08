@@ -11,6 +11,8 @@ CREATE TABLE candidates (
   salary_max INTEGER,
   remote_preference TEXT,
   career_goal TEXT,
+  personality JSONB,
+  values JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
@@ -66,6 +68,8 @@ CREATE TABLE jobs (
   education_requirements TEXT,
   required_certifications JSONB,
   nice_to_have_certifications JSONB,
+  company_values JSONB,
+  personality_preferences JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
