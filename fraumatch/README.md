@@ -31,7 +31,7 @@ The app runs in **Demo Mode** by default — it works instantly with built-in sa
 1. Open the terminal: press **Ctrl + `** (the backtick key, next to the 1 key)
 2. Type this and press Enter:
    ```
-   pip install streamlit requests pypdf python-docx
+   pip install -r requirements.txt
    python -m streamlit run app.py
    ```
 3. Your browser opens automatically at `http://localhost:8501`
@@ -61,7 +61,7 @@ If you haven't yet, create a GitHub repository:
 **Step 3 — Start the app**
 1. In the Codespace terminal (bottom of the window), type:
    ```
-   pip install streamlit requests pypdf python-docx
+   pip install -r requirements.txt
    python -m streamlit run app.py
    ```
 2. Streamlit shows a URL like `http://localhost:8501`
@@ -73,7 +73,9 @@ If you haven't yet, create a GitHub repository:
 
 ## How to Use the App
 
-The app has **4 pages** in the left sidebar:
+You must **create an account** or **log in** first (email + password). Your CV and profile are then saved securely to your account for future sessions.
+
+After logging in, the app has **5 pages** in the left sidebar:
 
 | Page | What it does |
 |------|--------------|
@@ -81,15 +83,28 @@ The app has **4 pages** in the left sidebar:
 | **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
 | **Job Matching** | Find matching jobs → ranked results with scores & explanations |
 | **Application Agent** | Generate a tailored cover letter & application |
+| **My Account** | View your saved profile, reload it for matching, see account details |
 
 > **AI mode toggle:** In the left sidebar you can turn on **🤖 AI mode**. It's **off by default** so the demo is instant and reliable. Turn it on (requires Ollama) to get AI-written explanations and cover letters.
 
+### 🔒 How your data is protected
+
+- **Passwords** are stored as salted hashes (PBKDF2, 200,000 iterations) — never in plain text
+- **CV content** is encrypted with AES (Fernet) before it is written to the database
+- The **database** and **encryption key** are excluded from Git (see `.gitignore`)
+- Each user can only access their **own** saved data
+- The app **never automatically shares or submits** your CV anywhere
+
+> This is a university proof-of-concept. A production deployment should add GDPR compliance documentation, password reset flows, and managed cloud hosting.
+
 ### Demo Flow for Class (Suggested Script)
 
+0. **Register** a test account (e.g., `demo@matcha.ch`) → show the profile dashboard
 1. **Dashboard** — Show the project overview and the matching weights (30% skills, 20% experience, etc.)
-2. **Candidate Profile** — Pick "Sophie Müller" → show the extracted profile (skills, experience, languages, preferences)
+2. **Candidate Profile** — Pick "Sophie Müller" → show the extracted profile → click **💾 Save to my account**
 3. **Job Matching** — Click **Find Matching Jobs** → show ranked results with scores and "why this match" explanations
-4. **Application Agent** — Select a job → generate a cover letter → check the approval step
+4. **My Account** — Show the saved profile was stored, then **Load my saved profile**
+5. **Application Agent** — Select a job → generate a cover letter → check the approval step
 
 ---
 
@@ -101,7 +116,8 @@ matcha/
 ├── agents/
 │   ├── profile_agent.py      # Agent 1: CV → Structured Profile
 │   ├── matching_agent.py     # Agent 2: Deterministic Job Matching
-│   └── application_agent.py  # Agent 3: Tailored Applications
+│   ├── application_agent.py  # Agent 3: Tailored Applications
+│   └── db.py                 # Secure accounts + encrypted profile storage
 ├── data/
 │   ├── sample_cvs.json       # Demo candidate profiles
 │   └── sample_jobs.json      # Demo job listings

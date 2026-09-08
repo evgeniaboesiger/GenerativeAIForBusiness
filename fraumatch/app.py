@@ -17,6 +17,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "agents"))
 from profile_agent import ProfileAgent
 from matching_agent import MatchingAgent
 from application_agent import ApplicationAgent
+from db import (
+    register_user, login_user, save_profile, load_profile, init_session,
+    get_connection
+)
 
 # PDF and Word document text extraction
 try:
@@ -116,17 +120,37 @@ def check_ollama_connection():
 
 def main():
     """Main application entry point."""
-    
+    init_session()
+
     # Sidebar - navigation
     st.sidebar.title("🤝 MATCHA")
     st.sidebar.markdown("*Smart Job Matching for Women in Switzerland*")
     st.sidebar.markdown("---")
-    
+
+    # Authentication flow: if not logged in, show login/register first.
+    if st.session_state.user is None:
+        show_auth_page()
+        return
+
+    # Show logged-in user in sidebar
+    user = st.session_state.user
+    st.sidebar.markdown(f"👤 **{user['full_name']}**")
+    st.sidebar.caption(user["email"])
+
     page = st.sidebar.radio(
         "Navigate",
-        ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Job Matching", "📝 Application Agent"]
+        ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Job Matching",
+         "📝 Application Agent", "🔐 My Account"]
     )
     
+    # Logout button
+    if st.sidebar.button("🚪 Log out", use_container_width=True):
+        st.session_state.user = None
+        st.session_state.current_profile = None
+        st.session_state.current_matches = []
+        st.rerun()
+    st.sidebar.markdown("---")
+
     # Check Ollama status
     ollama_ok = check_ollama_connection()
     
@@ -166,6 +190,111 @@ def main():
         show_matching_page(sample_jobs, use_ai)
     elif page == "📝 Application Agent":
         show_application_page(sample_jobs, use_ai)
+    elif page == "🔐 My Account":
+        show_account_page()
+
+
+def show_auth_page():
+    """Login / registration page shown when the user is not signed in."""
+    st.title("🤝 Welcome to MATCHA")
+    st.markdown(
+        "The Swiss employment-matching platform helping women find suitable jobs faster."
+    )
+    st.markdown("---")
+
+    # Buttons for choosing login vs register mode
+    tab_login, tab_register = st.tabs(["🔐 Log in", "📝 Create account"])
+
+    with tab_login:
+        with st.form("login_form"):
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Password", type="password", key="login_password")
+            submitted = st.form_submit_button("Log in", type="primary", use_container_width=True)
+            if submitted:
+                user = login_user(email, password)
+                if user:
+                    st.session_state.user = user
+                    st.success("Logged in successfully!")
+                    st.rerun()
+                else:
+                    st.error("Invalid email or password. Please try again.")
+
+    with tab_register:
+        with st.form("register_form"):
+            full_name = st.text_input("Full name", key="reg_name")
+            reg_email = st.text_input("Email", key="reg_email")
+            reg_password = st.text_input(
+                "Password (min. 6 characters)", type="password", key="reg_password"
+            )
+            role = st.selectbox("I am a...", ["Candidate (job seeker)", "Recruiter"])
+
+            submitted_reg = st.form_submit_button("Create account", type="primary", use_container_width=True)
+            if submitted_reg:
+                role_value = "candidate" if role.startswith("Candidate") else "recruiter"
+                try:
+                    user = register_user(reg_email, reg_password, full_name, role=role_value)
+                    st.session_state.user = user
+                    st.success(f"Welcome, {user['full_name']}! Please now log in with your new password.")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+
+    st.markdown("---")
+    with st.expander("🔒 How is my data protected?"):
+        st.markdown(
+            """
+            **MATCHA protects personal data:**
+
+            - **Passwords** are stored as salted hashes (PBKDF2) — never in plain text.
+            - **CV content** is encrypted before it is written to the database.
+            - The database and encryption key are kept out of the source repository.
+            - Accounts are per-user; each user can only see their own data.
+
+            *This is a university proof-of-concept. Always follow applicable data
+            protection regulations (e.g., GDPR) in a production deployment.*
+            """
+        )
+
+    # Quick demo access (optional convenience - not real auth)
+    st.markdown("---")
+    st.caption("**Demo tip:** Create a test account to try registration, or use any email + password you make up for a quick login.")
+
+
+def show_account_page():
+    """Show the user's saved data, allow loading a saved profile."""
+    user = st.session_state.user
+    st.title("🔐 My Account")
+    st.markdown("---")
+
+    st.subheader("Account details")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.text_input("Name", value=user["full_name"], disabled=True)
+    with col2:
+        st.text_input("Email", value=user["email"], disabled=True)
+    st.info(f"Role: {'Candidate' if user['role'] == 'candidate' else 'Recruiter'}")
+
+    st.markdown("---")
+    st.subheader("Saved profile & CV")
+
+    saved = load_profile(user["id"])
+    if saved:
+        st.success(f"Saved profile found (last updated: {saved.get('updated_at', '')}).")
+        if saved.get("profile"):
+            profile = saved["profile"]
+            name = profile.get("personal_info", {}).get("name", "N/A")
+            skills = profile.get("skills", [])
+            st.markdown(f"**Profile for:** {name}")
+            st.markdown(f"**Skills ({len(skills)}):** {', '.join(skills[:6]) if skills else 'N/A'}")
+        else:
+            st.info("No structured profile saved yet.")
+
+        # Load saved data into session so matching can continue
+        if st.button("🔄 Load my saved profile", use_container_width=True):
+            st.session_state.current_profile = saved.get("profile") or {}
+            st.success("Profile loaded! Go to **Job Matching** to find matches.")
+    else:
+        st.info("No saved profile yet. Extract a profile on the **Candidate Profile** page, then click **Save to my account**.")
 
 
 def show_dashboard():
@@ -351,6 +480,7 @@ def show_profile_page(sample_cvs, use_ai):
             # Store in session
             st.session_state.current_profile = profile
             st.session_state.current_profile_source = source_label
+            st.session_state.last_cv_text = cv_text
             
             st.success("✅ Profile extracted successfully!")
             show_profile_results(profile)
@@ -466,6 +596,24 @@ def show_profile_results(profile):
     
     st.markdown("---")
     st.info("💡 **Verification:** Please review all extracted information. You can correct any errors before proceeding to job matching.")
+
+    # Save profile to the user's account (stored encrypted in the database)
+    if st.session_state.user:
+        existing_saved = load_profile(st.session_state.user["id"])
+        col_save, _ = st.columns([1, 2])
+        with col_save:
+            if st.button("💾 Save to my account", type="primary", use_container_width=True):
+                try:
+                    save_profile(
+                        st.session_state.user["id"],
+                        getattr(st.session_state, "last_cv_text", ""),
+                        profile
+                    )
+                    st.success("✅ Profile and CV saved securely to your account!")
+                except Exception as e:
+                    st.error(f"Could not save profile: {e}")
+        if existing_saved and existing_saved.get("profile"):
+            st.caption("📁 You already have a saved profile. Saving again will update it.")
 
 
 def show_matching_page(sample_jobs, use_ai):

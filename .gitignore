@@ -8,3 +8,12 @@ dist/
 .next/
 /.idea/
 /.vscode/
+
+# MATCHA - sensitive data must never be committed
+fraumatch/matcha_users.db
+fraumatch/.matcha_key
+fraumatch/*.db
+fraumatch/*.db-journal
+fraumatch/**/matcha_users.db
+fraumatch/**/.matcha_key
+fraumatch/**/*.db
