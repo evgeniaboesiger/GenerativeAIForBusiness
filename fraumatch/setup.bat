@@ -1,6 +1,6 @@
-@echo off
+﻿@echo off
 echo ==========================================
-echo   FRAUMATCH - Setup Script
+echo   MATCHA - Setup Script
 echo ==========================================
 echo.
 
@@ -32,9 +32,9 @@ echo [Step 3/4] Checking if Ollama is running...
 powershell -Command "try { $response = Invoke-WebRequest -Uri 'http://localhost:11434/api/tags' -TimeoutSec 3; Write-Host 'OK - Ollama is running' } catch { Write-Host 'NOTE: Ollama is not running. Demo will use sample data only.' }"
 echo.
 
-echo [Step 4/4] Starting FRAUMATCH...
+echo [Step 4/4] Starting MATCHA...
 echo.
-echo FRAUMATCH will now start. Your browser will open automatically.
+echo MATCHA will now start. Your browser will open automatically.
 echo Keep this window open while using the app.
 echo Press Ctrl+C to stop the app when done.
 echo.

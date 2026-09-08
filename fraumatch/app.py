@@ -1,5 +1,5 @@
 """
-FRAUMATCH - Swiss Employment Matching Platform
+MATCHA - Swiss Employment Matching Platform
 A university proof-of-concept demonstrating AI-powered job matching
 
 This is the main Streamlit application that ties together all three agents.
@@ -9,6 +9,7 @@ import streamlit as st
 import json
 import os
 import sys
+import io
 
 # Add the agents directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "agents"))
@@ -17,9 +18,65 @@ from profile_agent import ProfileAgent
 from matching_agent import MatchingAgent
 from application_agent import ApplicationAgent
 
+# PDF and Word document text extraction
+try:
+    from pypdf import PdfReader
+except ImportError:
+    PdfReader = None
+
+try:
+    from docx import Document
+except ImportError:
+    Document = None
+
+def read_uploaded_file(uploaded_file) -> str:
+    """Extract text from an uploaded CV file (PDF, Word, or TXT)."""
+    import traceback
+
+    name = (uploaded_file.name or "").lower()
+    data = uploaded_file.getvalue()
+    try:
+        if name.endswith(".pdf"):
+            if PdfReader is None:
+                return "PDF support not installed. Add 'pypdf' to requirements.txt."
+            reader = PdfReader(io.BytesIO(data))
+            text_parts = []
+            for page in reader.pages:
+                try:
+                    text_parts.append(page.extract_text() or "")
+                except Exception:
+                    text_parts.append("")
+            text = "\n".join(text_parts).strip()
+            if not text:
+                return "Could not extract text from this PDF. It may be a scanned document (image-based)."
+            return text
+        elif name.endswith(".docx"):
+            if Document is None:
+                return "Word (.docx) support not installed. Add 'python-docx' to requirements.txt."
+            document = Document(io.BytesIO(data))
+            text_parts = []
+            for para in document.paragraphs:
+                if para.text.strip():
+                    text_parts.append(para.text.strip())
+            # Also pick up text from tables if present
+            for table in document.tables:
+                for row in table.rows:
+                    cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
+                    if cells:
+                        text_parts.append(" | ".join(cells))
+            text = "\n".join(text_parts).strip()
+            return text if text else "No text found in this Word document."
+        elif name.endswith(".txt"):
+            return data.decode("utf-8", errors="replace").strip() or "Empty text file."
+        else:
+            return f"Unsupported file type: {uploaded_file.name}. Please upload a .pdf, .docx, or .txt file."
+    except Exception as e:
+        traceback.print_exc()
+        return f"Error reading file {uploaded_file.name}: {str(e)}"
+
 # Page configuration
 st.set_page_config(
-    page_title="FRAUMATCH - Smart Job Matching",
+    page_title="MATCHA - Smart Job Matching",
     page_icon="🤝",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -61,7 +118,7 @@ def main():
     """Main application entry point."""
     
     # Sidebar - navigation
-    st.sidebar.title("🤝 FRAUMATCH")
+    st.sidebar.title("🤝 MATCHA")
     st.sidebar.markdown("*Smart Job Matching for Women in Switzerland*")
     st.sidebar.markdown("---")
     
@@ -72,8 +129,21 @@ def main():
     
     # Check Ollama status
     ollama_ok = check_ollama_connection()
+    
+    # AI mode toggle - default OFF for reliable fast demo, ON for AI explanations
+    use_ai = st.sidebar.toggle(
+        "🤖 AI mode (Ollama)",
+        value=False,
+        help="Enable AI-generated explanations and cover letters. Requires Ollama running. Fast demo mode is instant and reliable."
+    )
+    
     if not ollama_ok:
-        st.sidebar.warning("⚠️ Ollama (local AI) not detected. Starting app in demo mode with sample data.")
+        st.sidebar.warning("⚠️ Ollama (local AI) not detected. Fast demo mode will be used.")
+        use_ai = False
+    elif use_ai:
+        st.sidebar.success("🤖 AI mode active")
+    else:
+        st.sidebar.info("⚡ Fast demo mode (instant results)")
     
     # Load data
     sample_cvs = load_sample_cvs()
@@ -91,17 +161,17 @@ def main():
     if page == "🏠 Dashboard":
         show_dashboard()
     elif page == "👤 Candidate Profile":
-        show_profile_page(sample_cvs, ollama_ok)
+        show_profile_page(sample_cvs, use_ai)
     elif page == "🎯 Job Matching":
-        show_matching_page(sample_jobs, ollama_ok)
+        show_matching_page(sample_jobs, use_ai)
     elif page == "📝 Application Agent":
-        show_application_page(sample_jobs, ollama_ok)
+        show_application_page(sample_jobs, use_ai)
 
 
 def show_dashboard():
     """Main dashboard with overview and impact metrics."""
     
-    st.title("👩‍💼 FRAUMATCH Dashboard")
+    st.title("👩‍💼 MATCHA Dashboard")
     st.markdown("---")
     
     # Hero section
@@ -117,15 +187,15 @@ def show_dashboard():
     st.markdown("---")
     
     # Project overview
-    st.subheader("🎯 What is FRAUMATCH?")
+    st.subheader("🎯 What is MATCHA?")
     st.markdown("""
-    FRAUMATCH is a **Swiss employment-matching platform** designed to:
+    MATCHA is a **Swiss employment-matching platform** designed to:
     
     - **Help women job seekers** identify suitable job opportunities faster
     - **Help recruiters** identify relevant candidates with less manual screening
     - **Reduce screening effort** while improving transparency and consistency
     
-    FRAUMATCH does **NOT** replace recruiters or make automated hiring decisions. 
+    MATCHA does **NOT** replace recruiters or make automated hiring decisions. 
     It assists human decision-making with AI-powered tools.
     """)
     
@@ -201,7 +271,7 @@ def show_dashboard():
     # About section
     st.subheader("🏛️ About This Project")
     st.markdown("""
-    **FRAUMATCH** is a university proof-of-concept demonstrating:
+    **MATCHA** is a university proof-of-concept demonstrating:
     
     1. **AI can be implemented responsibly** - with human oversight
     2. **AI creates measurable business value** - faster matching, reduced screening
@@ -217,33 +287,56 @@ def show_profile_page(sample_cvs, ollama_ok):
     st.title("📋 Candidate Profile Extraction")
     st.markdown("---")
     
-    st.subheader("Step 1: Select or Paste a CV")
+    st.subheader("Step 1: Choose How to Provide the CV")
     
-    # Option to use sample data
-    use_sample = st.selectbox(
-        "Choose a sample CV or paste your own",
-        ["Select a sample CV..."] + [cv["name"] for cv in sample_cvs]
+    # Input source selector
+    input_mode = st.radio(
+        "Select an input method:",
+        ["📁 Upload a CV file", "📄 Use a sample CV", "✍️ Paste CV text"],
+        horizontal=True
     )
     
     cv_text = ""
-    if use_sample != "Select a sample CV...":
-        # Find the selected CV
-        selected = next((cv for cv in sample_cvs if cv["name"] == use_sample), None)
-        if selected:
-            cv_text = selected["cv_text"]
-            st.info(f"Selected: {selected['name']}")
+    source_label = ""
     
-    # OR paste custom CV
-    st.markdown("**— OR —**")
-    custom_cv = st.text_area(
-        "Paste your own CV text here:",
-        value=cv_text,
-        height=200,
-        placeholder="Paste your CV text here..."
-    )
+    if input_mode == "📁 Upload a CV file":
+        uploaded_file = st.file_uploader(
+            "Upload your CV (PDF, Word, or TXT)",
+            type=["pdf", "docx", "txt"],
+            help="Uploading a file makes it possible to extract your CV for analysis."
+        )
+        if uploaded_file is not None:
+            with st.spinner("Reading file..."):
+                cv_text = read_uploaded_file(uploaded_file)
+                source_label = f"📁 {uploaded_file.name}"
+            if cv_text:
+                st.info(f"Loaded text from **{uploaded_file.name}** ({len(cv_text)} characters)")
+            else:
+                st.warning("No text could be read from this file.")
     
-    if custom_cv:
-        cv_text = custom_cv
+    elif input_mode == "📄 Use a sample CV":
+        use_sample = st.selectbox(
+            "Choose a sample CV for the demo:",
+            ["Select a sample CV..."] + [cv["name"] for cv in sample_cvs]
+        )
+        if use_sample != "Select a sample CV...":
+            selected = next((cv for cv in sample_cvs if cv["name"] == use_sample), None)
+            if selected:
+                cv_text = selected["cv_text"]
+                source_label = f"📄 {selected['name']}"
+                st.info(f"Selected: {selected['name']}")
+    
+    else:  # Paste CV text
+        custom_cv = st.text_area(
+            "Paste your CV text here:",
+            height=200,
+            placeholder="Copy and paste your CV text here..."
+        )
+        if custom_cv:
+            cv_text = custom_cv
+            source_label = "✍️ Pasted CV"
+    
+    st.markdown("---")
     
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -251,22 +344,19 @@ def show_profile_page(sample_cvs, ollama_ok):
     
     if extract_button and cv_text:
         with st.spinner("Profile Agent is analyzing your CV..."):
-            # Use the Profile Agent
+            # Use the Profile Agent (fast deterministic extraction - always works)
             profile_agent = ProfileAgent()
-            
-            if ollama_ok:
-                profile = profile_agent.extract_profile(cv_text)
-            else:
-                profile = profile_agent.extract_profile_simple(cv_text)
+            profile = profile_agent.extract_profile_main(cv_text)
             
             # Store in session
             st.session_state.current_profile = profile
+            st.session_state.current_profile_source = source_label
             
             st.success("✅ Profile extracted successfully!")
             show_profile_results(profile)
     
     elif extract_button and not cv_text:
-        st.warning("Please select a sample CV or paste CV text.")
+        st.warning("No CV provided. Please upload a file, select a sample, or paste CV text.")
     
     # Show existing profile if available
     elif st.session_state.current_profile:
@@ -378,7 +468,7 @@ def show_profile_results(profile):
     st.info("💡 **Verification:** Please review all extracted information. You can correct any errors before proceeding to job matching.")
 
 
-def show_matching_page(sample_jobs, ollama_ok):
+def show_matching_page(sample_jobs, use_ai):
     """Job Matching page - uses Matching Agent."""
     
     st.title("🎯 Job Matching")
@@ -407,7 +497,7 @@ def show_matching_page(sample_jobs, ollama_ok):
                 return
             
             # Find matches
-            matches = matching_agent.find_matches(profile, sample_jobs, top_n=top_n)
+            matches = matching_agent.find_matches(profile, sample_jobs, top_n=top_n, use_ai=use_ai)
             st.session_state.current_matches = matches
             
             st.success(f"Found {len(matches)} potential matches!")
@@ -504,7 +594,7 @@ def show_matches(matches):
             st.markdown("---")
 
 
-def show_application_page(sample_jobs, ollama_ok):
+def show_application_page(sample_jobs, use_ai):
     """Application Agent page."""
     
     st.title("📝 Application Agent")
@@ -601,7 +691,7 @@ def show_application_page(sample_jobs, ollama_ok):
                 st.markdown("""
                 Before you can submit this application, please review all materials carefully.
                 
-                FRAUMATCH does **NOT** automatically submit applications.
+                MATCHA does **NOT** automatically submit applications.
                 """)
                 
                 approve = st.checkbox("I have reviewed all information and approve this application")
@@ -625,13 +715,13 @@ def show_application_page(sample_jobs, ollama_ok):
         # Show disclaimer always
         with st.expander("⚠️ Important Disclaimer"):
             st.markdown("""
-            **FRAUMATCH Application Agent Disclaimer:**
+            **MATCHA Application Agent Disclaimer:**
             
             - All application materials are generated using **verified candidate information only**
             - The AI **never invents** experience, qualifications, skills, or achievements
             - The candidate **must approve** the application before it is sent
             - Applications are **never automatically submitted** to employers
-            - FRAUMATCH assists but does **not** replace human recruiters
+            - MATCHA assists but does **not** replace human recruiters
             """)
 
 

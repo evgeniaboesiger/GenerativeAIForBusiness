@@ -22,19 +22,22 @@ class ApplicationAgent:
         self.ollama_url = ollama_url
         self.model = "llama3.2"
     
-    def generate_application(self, profile: Dict[str, Any], job: Dict[str, Any]) -> Dict[str, str]:
+    def generate_application(self, profile: Dict[str, Any], job: Dict[str, Any],
+                             use_ai: bool = True) -> Dict[str, str]:
         """
         Main function: Generate tailored application materials.
         
         Args:
             profile: Verified candidate profile
             job: Target job listing
+            use_ai: If True, use LLM for the cover letter. If False, use
+                    a fast deterministic cover letter (no AI needed).
             
         Returns:
             Dictionary with cover letter, CV summary, and application notes
         """
         application = {
-            "cover_letter": self._generate_cover_letter(profile, job),
+            "cover_letter": self._generate_cover_letter(profile, job, use_ai=use_ai),
             "cv_summary": self._generate_cv_summary(profile, job),
             "application_notes": self._generate_application_notes(profile, job),
             "disclaimer": self._get_disclaimer()
@@ -42,8 +45,11 @@ class ApplicationAgent:
         
         return application
     
-    def _generate_cover_letter(self, profile: Dict[str, Any], job: Dict[str, Any]) -> str:
+    def _generate_cover_letter(self, profile: Dict[str, Any], job: Dict[str, Any],
+                               use_ai: bool = True) -> str:
         """Generate a tailored cover letter using only verified information."""
+        if not use_ai:
+            return self._fallback_cover_letter(profile, job)
         
         # Extract verified information from profile
         name = profile.get("personal_info", {}).get("name", "[Candidate Name]")
@@ -190,7 +196,7 @@ Please review carefully before submitting:
 - Add any personal touches you want
 - Do NOT submit without your approval
 
-FRAUMATCH does NOT automatically submit applications to employers."""
+MATCHA does NOT automatically submit applications to employers."""
 
 
 # Test function

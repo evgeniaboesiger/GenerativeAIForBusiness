@@ -33,7 +33,7 @@ class MatchingAgent:
         self.model = "llama3.2"
     
     def find_matches(self, profile: Dict[str, Any], jobs: List[Dict[str, Any]], 
-                     top_n: int = 5) -> List[Dict[str, Any]]:
+                     top_n: int = 5, use_ai: bool = True) -> List[Dict[str, Any]]:
         """
         Main function: Find and rank job matches for a candidate.
         
@@ -41,6 +41,8 @@ class MatchingAgent:
             profile: Structured candidate profile
             jobs: List of job listings
             top_n: Number of top matches to return
+            use_ai: If True, use LLM for explanations. If False, use
+                    fast deterministic explanations (no AI needed).
             
         Returns:
             List of matches with scores and explanations
@@ -54,10 +56,13 @@ class MatchingAgent:
             # Step 2: Calculate deterministic score
             score, score_breakdown = self._calculate_score(profile, job)
             
-            # Step 3: Generate AI explanation (only if score > 0)
+            # Step 3: Generate explanation (AI or fast deterministic)
             explanation = ""
             if score > 0:
-                explanation = self._generate_explanation(profile, job, score, score_breakdown)
+                if use_ai:
+                    explanation = self._generate_explanation(profile, job, score, score_breakdown)
+                else:
+                    explanation = self._generate_fast_explanation(profile, job, score, score_breakdown)
             
             # Step 4: Create match result
             match_result = {
@@ -78,6 +83,33 @@ class MatchingAgent:
         matches.sort(key=lambda x: (x["mandatory_met"], x["score"]), reverse=True)
         
         return matches[:top_n]
+
+    def _generate_fast_explanation(self, profile: Dict[str, Any], job: Dict[str, Any],
+                                   score: float, breakdown: Dict[str, float]) -> str:
+        """Deterministic explanation built from the score breakdown (no AI needed)."""
+        parts = []
+        
+        # Find strengths from breakdown
+        strengths = []
+        for criterion, value in breakdown.items():
+            if value >= 0.7:
+                label = criterion.replace("_", " ").title()
+                strengths.append(label)
+        
+        if strengths:
+            parts.append(f"Strong match across: {', '.join(strengths[:3])}.")
+        
+        # Mention matched skills
+        profile_skills = set(s.lower() for s in profile.get("skills", []))
+        job_skills = set(s.lower() for s in job.get("skills_required", []))
+        matched_skills = [s for s in job_skills if s in profile_skills]
+        if matched_skills:
+            parts.append(f"Your skills in {', '.join([s.title() for s in matched_skills[:3]])} are directly relevant to this role.")
+        
+        # Mention location/remote
+        parts.append("This position fits your location and work preferences well.")
+        
+        return " ".join(parts)
     
     def _check_mandatory_requirements(self, profile: Dict[str, Any], job: Dict[str, Any]) -> bool:
         """
