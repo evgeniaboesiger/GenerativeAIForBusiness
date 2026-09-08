@@ -75,17 +75,53 @@ If you haven't yet, create a GitHub repository:
 
 You must **create an account** or **log in** first (email + password). Your CV and profile are then saved securely to your account for future sessions.
 
-After logging in, the app has **5 pages** in the left sidebar:
+After logging in, the app has **6 pages** in the left sidebar:
 
 | Page | What it does |
 |------|--------------|
-| **Dashboard** | Overview of the project + impact metrics |
+| **Dashboard** | Overview of the project + impact metrics + the matching-efficiency experiment |
 | **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
-| **Job Matching** | Find matching jobs → ranked results with scores & explanations |
+| **Career Goals** | Onboarding wizard for explicit work preferences (employment %, salary, location, remote, career goals…) — see below |
+| **Job Matching** | Find matching jobs → ranked results with scores, explanations & preference checks |
 | **Application Agent** | Generate a tailored cover letter & application |
-| **My Account** | View your saved profile, reload it for matching, see account details |
+| **My Account** | View your saved profile & preferences, reload them, see account details |
 
 > **AI mode toggle:** In the left sidebar you can turn on **🤖 AI mode**. It's **off by default** so the demo is instant and reliable. Turn it on (requires Ollama) to get AI-written explanations and cover letters.
+
+---
+
+## 🎯 Career Goals & Work Preferences
+
+The app collects **explicit, job-relevant preferences** directly from the candidate through an onboarding wizard (Step 1 is the professional profile, then Steps 2–6):
+
+1. **Career Goals** — multi-select goals + optional free text (never ranked directly)
+2. **Work Preferences** — 1–5 importance scales for working style, company size and work values
+3. **Location & Remote Work** — preferred cities, max commute, relocation, work arrangement & remote importance
+4. **Salary & Employment** — employment percentage (target / min / max / flexible), salary range + currency, "flexible / open to discussion"
+5. **Review & Confirm** — the candidate sees a full summary and confirms before saving
+
+**How preferences are stored & used**
+
+- Stored **separately from the professional profile**, encrypted in the database (`candidate_preferences` table)
+- Preferences feed the **deterministic matching engine** (not a separate AI score) using the same weights:
+  **Employment = 10% · Location = 10% · Salary = 5% · Career Goals = 5%**
+- Every recommendation shows a **"Why this job matches your preferences"** checklist (✓ / ⚠ / ℹ) generated only from the stored preferences and structured job data
+- **No preference is ever a rejection**: a salary or employment mismatch only lowers the recommendation score, and 100% flexible options are treated as fully compatible
+- A candidate can **edit preferences at any time** (re-run the wizard on the Career Goals page)
+
+**Onboarding flow in the app:** ① *Candidate Profile* → ② Career Goals → ③ Work Preferences → ④ Location & Remote → ⑤ Salary & Employment → ⑥ Review & Confirm.
+
+### ⚖️ Ethics: preferences, not personality
+
+This feature intentionally **does not** implement a psychological personality test. It collects only explicit work-environment preferences.
+
+- No personality scores, types, "culture fit", loyalty, retention, motivation or mental-state assessments are computed or stored
+- Protected characteristics are never collected or used
+- Missing preference data never penalizes a candidate (neutral scores)
+- Career changes / career breaks are **not** penalized (they are treated as neutral or aligned)
+- Work values are only used when the **job** contains the corresponding structured attribute
+
+The UI tells the candidate: *"Your preferences describe the type of work environment you are looking for. They are used to improve job recommendations and are not used to assess your personality or personal worth."*
 
 ### 🔒 How your data is protected
 
@@ -102,9 +138,42 @@ After logging in, the app has **5 pages** in the left sidebar:
 0. **Register** a test account (e.g., `demo@matcha.ch`) → show the profile dashboard
 1. **Dashboard** — Show the project overview and the matching weights (30% skills, 20% experience, etc.)
 2. **Candidate Profile** — Pick "Sophie Müller" → show the extracted profile → click **💾 Save to my account**
-3. **Job Matching** — Click **Find Matching Jobs** → show ranked results with scores and "why this match" explanations
-4. **My Account** — Show the saved profile was stored, then **Load my saved profile**
-5. **Application Agent** — Select a job → generate a cover letter → check the approval step
+3. **Career Goals** — Fill in the wizard → show the Review & Confirm summary → save → show the ethics note ("preferences, not personality")
+4. **Job Matching** — Click **Find Matching Jobs** → expand **"🎯 Why this job matches your preferences"** to show ✓/⚠ preference checks
+5. **My Account** — Show the saved profile *and preferences* were stored, then **Load my saved profile**
+6. **Application Agent** — Select a job → generate a cover letter → check the approval step
+7. **Dashboard → Matching Efficiency Experiment** — show Version A vs Version B telemetry
+
+---
+
+## 📊 Matching Efficiency Experiment (A vs B)
+
+The app anonymously logs aggregate matching metadata (no personal data) so you can demonstrate whether **richer candidate preferences create business value**:
+
+| Metric | Description |
+|--------|-------------|
+| Relevant recommendations | Matches with score ≥ 60 |
+| Time to identify jobs | Wall-clock time per matching run |
+| Jobs reviewed | Positions scanned before/among recommendations |
+| First relevant match rank | How early a relevant job appears in the results |
+| Score distribution | Share of matches in <25 / 25-50 / 50-75 / 75-100% |
+
+- **Version A** = matching from the CV / professional information only
+- **Version B** = CV + explicit candidate preferences
+
+The Dashboard expander **"Matching Efficiency Experiment"** shows both versions side by side. Results come **only from real runs** — nothing is fabricated. Data file: `data/match_telemetry.jsonl` (git-ignored).
+
+---
+
+## 🧪 Running the Automated Tests
+
+The preference model, matching rules and ethical safeguards are covered by a test suite:
+
+```
+python -m pytest tests/ -q
+```
+
+Run from the `matcha` folder. Tests cover employment %, salary (incl. flexible), remote/reference points, commute, location, career goals, work values, working-language preference, missing preferences, preference changes, and the ethical rules (no personality traits, no protected characteristics, no career-break penalty).
 
 ---
 
@@ -113,14 +182,20 @@ After logging in, the app has **5 pages** in the left sidebar:
 ```
 matcha/
 ├── app.py                    # Main Streamlit application
+├── preferences_ui.py         # Career Goals & Preferences onboarding wizard
 ├── agents/
 │   ├── profile_agent.py      # Agent 1: CV → Structured Profile
 │   ├── matching_agent.py     # Agent 2: Deterministic Job Matching
 │   ├── application_agent.py  # Agent 3: Tailored Applications
-│   └── db.py                 # Secure accounts + encrypted profile storage
+│   ├── preferences.py        # Structured preference model + compatibility rules
+│   ├── telemetry.py          # Anonymized A/B matching-efficiency logging
+│   └── db.py                 # Secure accounts + encrypted profile & preference storage
 ├── data/
 │   ├── sample_cvs.json       # Demo candidate profiles
-│   └── sample_jobs.json      # Demo job listings
+│   ├── sample_jobs.json      # Demo job listings (with structured attributes)
+│   └── match_telemetry.jsonl # Generated at runtime (git-ignored)
+├── tests/
+│   └── test_preferences.py   # Automated tests (49 cases)
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
@@ -129,11 +204,13 @@ matcha/
 
 ## Key Design Principles
 
-1. **Transparency** — Every match shows its score breakdown
+1. **Transparency** — Every match shows its score breakdown **and** its preference checklist
 2. **Human Control** — AI never makes hiring decisions
 3. **No Fabrication** — AI only uses verified candidate information
 4. **Deterministic Scoring** — Match scores come from rules, not AI
 5. **AI for Explanation** — The LLM explains matches in plain language
+6. **Preferences, not Personality** — Only explicit, job-relevant preferences are collected; no psychological assessments, and no automatic rejections based on salary or employment expectations
+7. **Data Minimization** — Optional questions are optional, preference data is encrypted, and is used only for employment matching
 
 ---
 

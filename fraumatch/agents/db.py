@@ -140,6 +140,14 @@ def _create_tables(conn: sqlite3.Connection) -> None:
             saved_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS candidate_preferences (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE,
+            prefs_json_encrypted TEXT,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
     conn.commit()
@@ -251,6 +259,56 @@ def load_profile(user_id: int) -> Optional[Dict[str, Any]]:
         if row["profile_json_encrypted"]:
             result["profile"] = json.loads(decrypt_text(row["profile_json_encrypted"]))
         return result
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------- #
+#  Candidate preferences (stored separately from professional facts, encrypted)
+# ---------------------------------------------------------------------- #
+def save_preferences(user_id: int, prefs: Dict[str, Any]) -> None:
+    """
+    Upsert the candidate's structured employment preferences.
+    Stored encrypted just like CV data; kept separate from the professional
+    profile so factual qualifications and preference data stay distinct.
+    """
+    prefs_enc = encrypt_text(json.dumps(prefs, ensure_ascii=False))
+
+    conn = get_connection()
+    try:
+        existing = conn.execute(
+            "SELECT id FROM candidate_preferences WHERE user_id = ?", (user_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE candidate_preferences SET prefs_json_encrypted = ?, "
+                "updated_at = datetime('now') WHERE user_id = ?",
+                (prefs_enc, user_id)
+            )
+        else:
+            conn.execute(
+                "INSERT INTO candidate_preferences (user_id, prefs_json_encrypted) VALUES (?, ?)",
+                (user_id, prefs_enc)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_preferences(user_id: int) -> Optional[Dict[str, Any]]:
+    """Return the candidate's stored preferences dict, or None if never saved."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT prefs_json_encrypted, updated_at FROM candidate_preferences "
+            "WHERE user_id = ?",
+            (user_id,)
+        ).fetchone()
+        if row is None or not row["prefs_json_encrypted"]:
+            return None
+        prefs = json.loads(decrypt_text(row["prefs_json_encrypted"]))
+        prefs["_updated_at"] = row["updated_at"]
+        return prefs
     finally:
         conn.close()
 

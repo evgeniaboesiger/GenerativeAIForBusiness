@@ -4,7 +4,7 @@
     "title": "Marketing Manager Digital",
     "company": "Basel Pharma AG",
     "location": "Basel",
-    "description": "We are looking for an experienced Digital Marketing Manager to lead our online marketing efforts. You will manage campaigns across multiple channels and lead a small team.",
+    "description": "We are looking for an experienced Digital Marketing Manager to lead our online marketing efforts and grow in a supportive career development environment. You will manage campaigns across multiple channels and lead a small team.",
     "requirements": {
       "mandatory": [
         "5+ years marketing experience",
@@ -23,14 +23,26 @@
       "remote_policy": "Hybrid (2 days remote)",
       "start_date": "Immediately"
     },
-    "skills_required": ["Digital Marketing", "Brand Management", "SEO/SEM", "Google Analytics", "Team Leadership", "Project Management"]
+    "skills_required": ["Digital Marketing", "Brand Management", "SEO/SEM", "Google Analytics", "Team Leadership", "Project Management"],
+    "employment_pct_min": 100,
+    "employment_pct_max": 100,
+    "salary_min": 110000,
+    "salary_max": 130000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 25,
+    "working_languages": ["German", "English"],
+    "company_size": "large",
+    "work_values": {"teamwork": 4, "career_development": 4, "work_life_balance": 3, "autonomy": 3}
   },
   {
     "id": "job_002",
     "title": "Marketing Coordinator Part-Time",
     "company": "Schweizer Gesundheit AG",
     "location": "Basel",
-    "description": "Looking for a part-time marketing coordinator to support our health awareness campaigns. Perfect for someone returning to the workforce.",
+    "description": "Looking for a part-time marketing coordinator to support our health awareness campaigns with flexible working hours and a good work-life balance. Perfect for someone returning to the workforce or re-entering after a career break.",
     "requirements": {
       "mandatory": [
         "3+ years marketing experience",
@@ -48,14 +60,26 @@
       "remote_policy": "Hybrid (3 days remote)",
       "start_date": "Within 1 month"
     },
-    "skills_required": ["Digital Marketing", "Social Media", "Content Creation", "Adobe Creative Suite"]
+    "skills_required": ["Digital Marketing", "Social Media", "Content Creation", "Adobe Creative Suite"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 60,
+    "salary_min": 55000,
+    "salary_max": 65000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 60,
+    "work_arrangement": "mostly_remote",
+    "commute_minutes": 25,
+    "working_languages": ["German"],
+    "company_size": "medium",
+    "work_values": {"work_life_balance": 5, "learning": 4, "social_impact": 4, "teamwork": 3}
   },
   {
     "id": "job_003",
     "title": "Senior Software Engineer",
     "company": "Fintech Startup Zurich",
     "location": "Zurich",
-    "description": "Join our growing fintech startup as a Senior Software Engineer. Work on cutting-edge payment solutions with a modern tech stack.",
+    "description": "Join our innovative fintech startup as a Senior Software Engineer. Work on cutting-edge payment solutions with a modern tech stack, full autonomy and continuous learning.",
     "requirements": {
       "mandatory": [
         "4+ years software development",
@@ -74,14 +98,26 @@
       "remote_policy": "Fully Remote",
       "start_date": "Flexible"
     },
-    "skills_required": ["JavaScript", "TypeScript", "React", "Node.js", "PostgreSQL", "AWS"]
+    "skills_required": ["JavaScript", "TypeScript", "React", "Node.js", "PostgreSQL", "AWS"],
+    "employment_pct_min": 100,
+    "employment_pct_max": 100,
+    "salary_min": 120000,
+    "salary_max": 140000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 100,
+    "work_arrangement": "fully_remote",
+    "commute_minutes": 0,
+    "working_languages": ["English"],
+    "company_size": "startup",
+    "work_values": {"innovation": 5, "autonomy": 4, "learning": 4, "career_development": 4}
   },
   {
     "id": "job_004",
     "title": "Backend Developer",
     "company": "Swiss Digital Solutions",
     "location": "Zurich",
-    "description": "We need a backend developer to build scalable APIs and microservices. Great opportunity for growth in a supportive team.",
+    "description": "We need a backend developer to build scalable APIs and microservices. Great opportunity for growth in a supportive team with professional development and mentoring.",
     "requirements": {
       "mandatory": [
         "3+ years backend development",
@@ -100,14 +136,26 @@
       "remote_policy": "Remote (occasional office)",
       "start_date": "Immediately"
     },
-    "skills_required": ["Python", "Node.js", "PostgreSQL", "MongoDB", "Docker", "Git"]
+    "skills_required": ["Python", "Node.js", "PostgreSQL", "MongoDB", "Docker", "Git"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 95000,
+    "salary_max": 115000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 80,
+    "work_arrangement": "mostly_remote",
+    "commute_minutes": 20,
+    "working_languages": ["English", "German"],
+    "company_size": "medium",
+    "work_values": {"learning": 4, "teamwork": 4, "career_development": 4, "work_life_balance": 3}
   },
   {
     "id": "job_005",
     "title": "HR Business Partner",
     "company": "International Organization Geneva",
     "location": "Geneva",
-    "description": "Join our HR team supporting international staff. Multilingual environment with focus on employee development and relations.",
+    "description": "Join our HR team supporting international staff in an international, multilingual environment with strong focus on employee development and social impact.",
     "requirements": {
       "mandatory": [
         "5+ years HR experience",
@@ -126,14 +174,26 @@
       "remote_policy": "Office-based",
       "start_date": "Within 2 months"
     },
-    "skills_required": ["Recruitment", "Employee Relations", "Swiss Labor Law", "Performance Management", "Training & Development"]
+    "skills_required": ["Recruitment", "Employee Relations", "Swiss Labor Law", "Performance Management", "Training & Development"],
+    "employment_pct_min": 100,
+    "employment_pct_max": 100,
+    "salary_min": 95000,
+    "salary_max": 115000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 25,
+    "working_languages": ["French", "English"],
+    "company_size": "large",
+    "work_values": {"social_impact": 5, "international_environment": 5, "career_development": 4, "work_life_balance": 3}
   },
   {
     "id": "job_006",
     "title": "HR Assistant Part-Time",
     "company": "Banque Cantonale de Genève",
     "location": "Geneva",
-    "description": "Part-time HR assistant role perfect for returning professionals. Support recruitment and employee administration.",
+    "description": "Part-time HR assistant role with flexible hours and excellent work-life balance, perfect for returning professionals. Support recruitment and employee administration at a stable, established bank.",
     "requirements": {
       "mandatory": [
         "2+ years HR experience",
@@ -152,14 +212,26 @@
       "remote_policy": "Office-based",
       "start_date": "Immediately"
     },
-    "skills_required": ["Recruitment", "Employee Relations", "Administrative Support", "HRIS Systems"]
+    "skills_required": ["Recruitment", "Employee Relations", "Administrative Support", "HRIS Systems"],
+    "employment_pct_min": 50,
+    "employment_pct_max": 60,
+    "salary_min": 45000,
+    "salary_max": 55000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["French"],
+    "company_size": "large",
+    "work_values": {"work_life_balance": 5, "job_stability": 5, "learning": 3, "career_development": 3}
   },
   {
     "id": "job_007",
     "title": "Financial Analyst",
     "company": "UBS Wealth Management",
     "location": "Bern",
-    "description": "Analyze financial data and prepare reports for wealth management clients. Strong analytical skills required.",
+    "description": "Analyze financial data and prepare reports for wealth management clients at a stable, long-standing organization with clear career development paths. Strong analytical skills required.",
     "requirements": {
       "mandatory": [
         "3+ years financial analysis",
@@ -179,14 +251,26 @@
       "remote_policy": "Hybrid (2 days remote)",
       "start_date": "Within 1 month"
     },
-    "skills_required": ["Financial Analysis", "Excel", "SAP", "Power BI", "IFRS", "Accounting"]
+    "skills_required": ["Financial Analysis", "Excel", "SAP", "Power BI", "IFRS", "Accounting"],
+    "employment_pct_min": 80,
+    "employment_pct_max": 100,
+    "salary_min": 90000,
+    "salary_max": 110000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 40,
+    "work_arrangement": "hybrid",
+    "commute_minutes": 20,
+    "working_languages": ["German", "English"],
+    "company_size": "large",
+    "work_values": {"job_stability": 4, "career_development": 4, "teamwork": 3, "work_life_balance": 3}
   },
   {
     "id": "job_008",
     "title": "Junior Accountant",
     "company": "Mittelständisches Unternehmen Bern",
     "location": "Bern",
-    "description": "Entry-level accounting position with mentorship opportunities. Great for someone re-entering the finance field.",
+    "description": "Entry-level accounting position with mentorship and training opportunities and a good work-life balance. Great for someone re-entering the finance field or returning to the workforce.",
     "requirements": {
       "mandatory": [
         "Basic accounting knowledge",
@@ -205,6 +289,18 @@
       "remote_policy": "Office-based",
       "start_date": "Flexible"
     },
-    "skills_required": ["Accounting", "Excel", "Financial Reporting", "Taxation"]
+    "skills_required": ["Accounting", "Excel", "Financial Reporting", "Taxation"],
+    "employment_pct_min": 60,
+    "employment_pct_max": 80,
+    "salary_min": 60000,
+    "salary_max": 75000,
+    "salary_currency": "CHF",
+    "salary_period": "yearly",
+    "remote_pct": 0,
+    "work_arrangement": "fully_office",
+    "commute_minutes": 15,
+    "working_languages": ["German"],
+    "company_size": "medium",
+    "work_values": {"learning": 4, "work_life_balance": 4, "job_stability": 3, "career_development": 3}
   }
 ]

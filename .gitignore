@@ -17,3 +17,6 @@ fraumatch/*.db-journal
 fraumatch/**/matcha_users.db
 fraumatch/**/.matcha_key
 fraumatch/**/*.db
+
+# MATCHA - anonymized experiment telemetry (generated at runtime)
+fraumatch/data/match_telemetry.jsonl

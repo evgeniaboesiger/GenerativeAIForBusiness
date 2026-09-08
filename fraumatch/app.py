@@ -19,8 +19,12 @@ from matching_agent import MatchingAgent
 from application_agent import ApplicationAgent
 from db import (
     register_user, login_user, save_profile, load_profile, init_session,
-    get_connection
+    get_connection, load_preferences, save_preferences
 )
+from telemetry import summary as telemetry_summary
+
+# Career Goals & Work Preferences onboarding wizard
+from preferences_ui import show_preferences_page, get_active_preferences
 
 # PDF and Word document text extraction
 try:
@@ -139,8 +143,8 @@ def main():
 
     page = st.sidebar.radio(
         "Navigate",
-        ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Job Matching",
-         "📝 Application Agent", "🔐 My Account"]
+        ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Career Goals",
+         "🎯 Job Matching", "📝 Application Agent", "🔐 My Account"]
     )
     
     # Logout button
@@ -148,6 +152,8 @@ def main():
         st.session_state.user = None
         st.session_state.current_profile = None
         st.session_state.current_matches = []
+        st.session_state.current_preferences = None
+        st.session_state.pref_working = None
         st.rerun()
     st.sidebar.markdown("---")
 
@@ -186,6 +192,8 @@ def main():
         show_dashboard()
     elif page == "👤 Candidate Profile":
         show_profile_page(sample_cvs, use_ai)
+    elif page == "🎯 Career Goals":
+        show_preferences_page()
     elif page == "🎯 Job Matching":
         show_matching_page(sample_jobs, use_ai)
     elif page == "📝 Application Agent":
@@ -296,6 +304,20 @@ def show_account_page():
     else:
         st.info("No saved profile yet. Extract a profile on the **Candidate Profile** page, then click **Save to my account**.")
 
+    st.markdown("---")
+    st.subheader("🎯 Saved career preferences")
+    saved_prefs = load_preferences(user["id"])
+    if saved_prefs:
+        st.success(f"Career goals & work preferences saved (last updated: {saved_prefs.get('_updated_at', '')}).")
+        summary = get_active_preferences()
+        if summary:
+            from preferences import preferences_summary
+            for label, value in preferences_summary(summary):
+                st.markdown(f"- **{label}:** {value}")
+        st.info("Edit them anytime on the **Career Goals** page - they are used for matching recommendations.")
+    else:
+        st.info("No career preferences saved yet. Set them on the **Career Goals** page to get preferences-aware recommendations.")
+
 
 def show_dashboard():
     """Main dashboard with overview and impact metrics."""
@@ -396,7 +418,47 @@ def show_dashboard():
                 st.metric(name, f"{pct}%")
     
     st.markdown("---")
-    
+
+    # Matching efficiency experiment (telemetry - real data only, never invented)
+    with st.expander("📊 Matching Efficiency Experiment (A/B test)"):
+        st.markdown(
+            "Each time a **Job Matching** run completes, anonymized aggregate metrics are "
+            "recorded. Compare two groups to see whether collecting explicit preferences "
+            "(**Version B**) improves matching efficiency over CV-only matching (**Version A**). "
+            "*No personal data is logged; results come only from real runs.*"
+        )
+        stats = telemetry_summary()
+        if stats["total_runs"] == 0:
+            st.info("No matching runs recorded yet. Run a few matches with and without career preferences to populate the chart.")
+        else:
+            colA, colB = st.columns(2)
+            for col, version in ((colA, "A"), (colB, "B")):
+                agg = stats["versions"][version]
+                label = {"A": "Version A · CV only", "B": "Version B · CV + preferences"}[version]
+                with col:
+                    st.markdown(f"#### {label}")
+                    if agg is None:
+                        st.write("No runs recorded for this version yet.")
+                    else:
+                        st.metric("Runs", agg["runs"])
+                        st.metric("Avg. match score", f"{agg.get('avg_match_score')}%" if agg.get("avg_match_score") is not None else "—")
+                        st.metric("Avg. time per run", f"{agg.get('avg_time_s', 0)}s")
+                        st.metric("Jobs reviewed / run", agg.get("avg_jobs_reviewed"))
+                        st.metric("Relevant recommendations", agg.get("total_relevant_recommendations"))
+                        fr = agg.get("avg_first_relevant_rank")
+                        st.metric("First relevant match at rank", f"{fr}" if fr is not None else "—")
+                        dist = stats["distribution"].get(version) or {}
+                        if dist:
+                            st.write("**Score distribution:**")
+                            for bucket, frac in dist.items():
+                                st.markdown(f"`{bucket}%` — {round(frac * 100)}%")
+        st.caption(
+            "Metrics: number of relevant recommendations (score ≥ 60), time to identify "
+            "jobs, jobs reviewed before finding a relevant opportunity, match-score "
+            "distribution. This demonstrates whether richer candidate preferences create "
+            "measurable business value."
+        )
+
     # About section
     st.subheader("🏛️ About This Project")
     st.markdown("""
@@ -628,27 +690,43 @@ def show_matching_page(sample_jobs, use_ai):
     
     profile = st.session_state.current_profile
     st.success(f"Matching for: **{profile.get('personal_info', {}).get('name', 'Candidate')}**")
-    
+
+    # Merge the candidate's explicit preferences (if any) into the profile so
+    # the matching engine can use them. Missing preferences stay neutral.
+    active_prefs = get_active_preferences()
+    prefs_status = "not set"
+    if active_prefs:
+        profile = {**profile, "preferences": active_prefs}
+        prefs_status = "active"
+
+    if active_prefs:
+        st.info("🎯 Your saved **Career Goals & Work Preferences** are being used to tailor these recommendations.")
+    else:
+        st.info("ℹ️ You have **no career preferences set yet**. Recommendations use your CV only. "
+                "Add preferences on the **Career Goals** page for more tailored results.")
+
     col1, col2 = st.columns([1, 2])
     with col1:
         top_n = st.slider("Number of matches to show", 3, 8, 5)
-    
+
     match_button = st.button("🔍 Find Matching Jobs", type="primary")
-    
+
     if match_button:
         with st.spinner("Matching Agent is analyzing job compatibility..."):
             matching_agent = MatchingAgent()
-            
+
             # Check if profile has error
             if "error" in profile:
                 st.error("Profile extraction had errors. Please re-extract profile.")
                 return
-            
-            # Find matches
-            matches = matching_agent.find_matches(profile, sample_jobs, top_n=top_n, use_ai=use_ai)
+
+            import time
+            start = time.time()
+            matches = matching_agent.find_matches(profile, sample_jobs, top_n=top_n,
+                                                  use_ai=use_ai, record_telemetry=True)
             st.session_state.current_matches = matches
-            
-            st.success(f"Found {len(matches)} potential matches!")
+
+            st.success(f"Found {len(matches)} potential matches (took {time.time() - start:.2f}s, preferences: {prefs_status}).")
     
     # Display matches
     if st.session_state.current_matches:
@@ -721,12 +799,26 @@ def show_matches(matches):
             # Score breakdown
             with st.expander("📊 Score Breakdown"):
                 breakdown = match.get("score_breakdown", {})
-                
+
                 for criterion, value in breakdown.items():
                     label = criterion.replace("_", " ").title()
                     st.markdown(f"**{label}:** {value}%")
                     st.progress(min(value / 100, 1.0))
-            
+
+            # Explainable preference compatibility
+            preference_checks = match.get("preference_checks", [])
+            if preference_checks:
+                with st.expander("🎯 Why this job matches your preferences"):
+                    for check in preference_checks:
+                        status = check.get("status", "info")
+                        text = check.get("text", "")
+                        if status == "ok":
+                            st.markdown(f"✅ {text}")
+                        elif status == "warn":
+                            st.markdown(f"⚠️ {text}")
+                        else:
+                            st.markdown(f"ℹ️ {text}")
+
             # Explanation (AI-generated)
             if match.get("explanation"):
                 with st.expander("💬 Why this match?"):
