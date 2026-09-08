@@ -281,7 +281,7 @@ def show_dashboard():
     """)
 
 
-def show_profile_page(sample_cvs, ollama_ok):
+def show_profile_page(sample_cvs, use_ai):
     """Candidate Profile page - uses Profile Agent."""
     
     st.title("📋 Candidate Profile Extraction")
@@ -639,11 +639,7 @@ def show_application_page(sample_jobs, use_ai):
             with st.spinner("Application Agent is preparing your application materials..."):
                 application_agent = ApplicationAgent()
                 
-                if ollama_ok:
-                    result = application_agent.generate_application(profile, selected_job)
-                else:
-                    result = application_agent.generate_application(profile, selected_job)
-                    # Even in demo mode, use the generation (it has fallbacks)
+                result = application_agent.generate_application(profile, selected_job, use_ai=use_ai)
                 
                 st.session_state.current_application = result
                 st.session_state.current_application_job = selected_job

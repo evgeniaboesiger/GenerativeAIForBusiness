@@ -31,7 +31,7 @@ The app runs in **Demo Mode** by default — it works instantly with built-in sa
 1. Open the terminal: press **Ctrl + `** (the backtick key, next to the 1 key)
 2. Type this and press Enter:
    ```
-   pip install streamlit requests
+   pip install streamlit requests pypdf python-docx
    python -m streamlit run app.py
    ```
 3. Your browser opens automatically at `http://localhost:8501`
@@ -61,7 +61,7 @@ If you haven't yet, create a GitHub repository:
 **Step 3 — Start the app**
 1. In the Codespace terminal (bottom of the window), type:
    ```
-   pip install streamlit requests
+   pip install streamlit requests pypdf python-docx
    python -m streamlit run app.py
    ```
 2. Streamlit shows a URL like `http://localhost:8501`
@@ -78,9 +78,11 @@ The app has **4 pages** in the left sidebar:
 | Page | What it does |
 |------|--------------|
 | **Dashboard** | Overview of the project + impact metrics |
-| **Candidate Profile** | Pick a sample CV → see the structured profile extraction |
+| **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
 | **Job Matching** | Find matching jobs → ranked results with scores & explanations |
 | **Application Agent** | Generate a tailored cover letter & application |
+
+> **AI mode toggle:** In the left sidebar you can turn on **🤖 AI mode**. It's **off by default** so the demo is instant and reliable. Turn it on (requires Ollama) to get AI-written explanations and cover letters.
 
 ### Demo Flow for Class (Suggested Script)
 
