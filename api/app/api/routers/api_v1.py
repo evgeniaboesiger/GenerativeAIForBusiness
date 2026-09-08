@@ -9,9 +9,15 @@ from app.orchestrator import schemas as orchestrator_schemas
 from app.db.models import Workflow, AgentLog
 from app.profile.agent import ProfileAgent
 from app.profile.schemas import ProfileExtractionRequest, ProfileReviewUpdate
+from app.assessment import questions as assessment_questions
+from app.assessment.schemas import (
+    PersonalitySubmission,
+    ValuesSubmission,
+    CandidateValuesUpdate,
+    CompanyValuesUpdate,
+)
 
 router = APIRouter()
-PROFILE_AGENT = ProfileAgent(model_name="demo-profile-agent")
 PROFILE_AGENT = ProfileAgent(model_name="demo-profile-agent")
 
 
@@ -153,7 +159,9 @@ def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(ge
         "remote_preference": getattr(c, 'remote_preference', 'office'),
         "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
         "career_goal": getattr(c, 'career_goal', ''),
-        "desired_roles": getattr(c, 'desired_roles', [])
+        "desired_roles": getattr(c, 'desired_roles', []),
+        "personality": getattr(c, 'personality', None),
+        "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
     }
 
     job = {
@@ -172,6 +180,8 @@ def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(ge
         "salary_max": j.salary_max,
         "remote_percentage": getattr(j, 'remote_percentage', 0),
         "department": getattr(j, 'department', None),
+        "company_values": getattr(j, 'company_values', None),
+        "personality_preferences": getattr(j, 'personality_preferences', None),
     }
 
     result = score_candidate_job(candidate, job)
@@ -205,7 +215,9 @@ def match_candidate_all(candidate_id: int, db: Session = Depends(get_db)):
         "remote_preference": getattr(c, 'remote_preference', 'office'),
         "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
         "career_goal": getattr(c, 'career_goal', ''),
-        "desired_roles": getattr(c, 'desired_roles', [])
+        "desired_roles": getattr(c, 'desired_roles', []),
+        "personality": getattr(c, 'personality', None),
+        "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
     }
 
     results = []
@@ -226,6 +238,8 @@ def match_candidate_all(candidate_id: int, db: Session = Depends(get_db)):
             "salary_max": j.salary_max,
             "remote_percentage": getattr(j, 'remote_percentage', 0),
             "department": getattr(j, 'department', None),
+            "company_values": getattr(j, 'company_values', None),
+            "personality_preferences": getattr(j, 'personality_preferences', None),
         }
         r = score_candidate_job(candidate, job)
         results.append(r)
@@ -260,6 +274,8 @@ def match_job_all(job_id: int, db: Session = Depends(get_db)):
         "salary_max": j.salary_max,
         "remote_percentage": getattr(j, 'remote_percentage', 0),
         "department": getattr(j, 'department', None),
+        "company_values": getattr(j, 'company_values', None),
+        "personality_preferences": getattr(j, 'personality_preferences', None),
     }
     results = []
     for c in candidates:
@@ -278,7 +294,9 @@ def match_job_all(job_id: int, db: Session = Depends(get_db)):
             "remote_preference": getattr(c, 'remote_preference', 'office'),
             "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
             "career_goal": getattr(c, 'career_goal', ''),
-            "desired_roles": getattr(c, 'desired_roles', [])
+            "desired_roles": getattr(c, 'desired_roles', []),
+            "personality": getattr(c, 'personality', None),
+            "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
         }
         r = score_candidate_job(candidate, job)
         results.append(r)
@@ -287,6 +305,72 @@ def match_job_all(job_id: int, db: Session = Depends(get_db)):
     db.commit()
     results.sort(key=lambda x: x.get('overall_score', 0), reverse=True)
     return results
+
+
+@router.get("/api/assessment/questions")
+def get_assessment_questions():
+    """Return the personality + values assessment framework to the frontend."""
+    return {
+        "personality_dimensions": assessment_questions.PERSONALITY_DIMENSIONS,
+        "personality_questions": assessment_questions.PERSONALITY_QUESTIONS,
+        "value_questions": assessment_questions.VALUE_QUESTIONS,
+        "company_values": assessment_questions.COMPANY_VALUES,
+    }
+
+
+@router.post("/api/assessment/personality")
+def submit_personality(payload: PersonalitySubmission, db: Session = Depends(get_db)):
+    """Save a candidate's personality assessment and compute their profile."""
+    profile = assessment_questions.compute_personality_profile(payload.responses)
+    if payload.candidate_id is not None:
+        c = db.query(models.Candidate).filter(models.Candidate.id == payload.candidate_id).first()
+        if not c:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        c.personality = profile
+        db.commit()
+    return profile
+
+
+@router.post("/api/assessment/values")
+def submit_values(payload: ValuesSubmission, db: Session = Depends(get_db)):
+    """Save a candidate's values assessment and compute their ranked values."""
+    ranked = assessment_questions.compute_values_from_responses(payload.responses)
+    if payload.candidate_id is not None:
+        c = db.query(models.Candidate).filter(models.Candidate.id == payload.candidate_id).first()
+        if not c:
+            raise HTTPException(status_code=404, detail="Candidate not found")
+        c.values = ranked
+        db.commit()
+    return {"values": ranked}
+
+
+@router.get("/api/assessment/candidate/{candidate_id}")
+def get_candidate_assessment(candidate_id: int, db: Session = Depends(get_db)):
+    """Return a candidate's stored personality profile and value ranking."""
+    c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return {
+        "personality": c.personality,
+        "values": c.values,
+    }
+
+
+@router.post("/api/assessment/job/{job_id}/values")
+def update_job_values(job_id: int, payload: CompanyValuesUpdate, db: Session = Depends(get_db)):
+    """Store a company's declared values (and optional personality preferences) for a job."""
+    j = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not j:
+        raise HTTPException(status_code=404, detail="Job not found")
+    j.company_values = payload.company_values
+    if payload.personality_preferences is not None:
+        j.personality_preferences = payload.personality_preferences
+    db.commit()
+    return {
+        "job_id": job_id,
+        "company_values": j.company_values,
+        "personality_preferences": j.personality_preferences,
+    }
 
 
 @router.post("/api/workflows/start/{candidate_id}/{job_id}")

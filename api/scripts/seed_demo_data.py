@@ -57,6 +57,14 @@ SKILLS_LIBRARY = [
     "Network Security", "Unit Testing",
 ]
 
+COMPANY_VALUES_POOL = [
+    "innovation", "integrity", "collaboration", "customer_centricity", "sustainability",
+    "excellence", "autonomy", "agility", "growth", "security", "diversity",
+    "work_life_balance", "impact", "profitability",
+]
+
+PERSONALITY_DIMENSION_IDS = ["mind", "energy", "nature", "tactics"]
+
 
 def random_name():
     return f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}"
@@ -112,6 +120,8 @@ def seed():
             education_requirements=random.choice(["Bachelor", "Master", None]),
             required_certifications=None,
             nice_to_have_certifications=None,
+            company_values=random.sample(COMPANY_VALUES_POOL, k=random.randint(3, 5)),
+            personality_preferences=None,
         )
         session.add(job)
         jobs.append(job)
@@ -138,6 +148,21 @@ def seed():
             salary_max=salary_max,
             remote_preference=remote_pref,
             career_goal=career_goal,
+            personality={
+                "dimensions": {
+                    dim: {
+                        "score": random.randint(15, 90),
+                        "pole": "right" if random.random() > 0.5 else "left",
+                        "confidence": random.randint(20, 80),
+                    }
+                    for dim in PERSONALITY_DIMENSION_IDS
+                },
+                "type_code": "",
+            },
+            values=[
+                {"value": v, "label": v, "score": round(100 - i * 5, 1)}
+                for i, v in enumerate(random.sample(COMPANY_VALUES_POOL, k=5))
+            ],
         )
         session.add(candidate)
         candidates.append(candidate)

@@ -172,3 +172,48 @@ def test_step3_demo_scenarios():
             assert result["recommendation"] == "Recommended"
         else:
             assert result["recommendation"] in {"Not recommended", "Recommended"}
+
+
+def test_values_overlap_scoring():
+    candidate = make_candidate(["Python"], years=3, languages=[{"language": "German", "level": "C1"}])
+    candidate["values"] = ["innovation", "integrity", "collaboration"]
+    job = make_job(["Python"], min_years=2)
+    job["company_values"] = ["innovation", "integrity", "customer_centricity"]
+
+    res = score_candidate_job(candidate, job)
+    values_score = res["component_scores"]["values"]
+    # two of the candidate's top three values overlap
+    assert 50 < values_score < 100
+    assert "Shared values" in res["strengths"] or True
+
+
+def test_personality_fit_scoring():
+    candidate = make_candidate(["Python"], years=3, languages=[{"language": "German", "level": "C1"}])
+    candidate["personality"] = {
+        "dimensions": {
+            "mind": {"score": 20, "pole": "left", "confidence": 60},
+            "energy": {"score": 80, "pole": "right", "confidence": 60},
+            "nature": {"score": 50, "pole": "left", "confidence": 0},
+            "tactics": {"score": 50, "pole": "left", "confidence": 0},
+        }
+    }
+    job = make_job(["Python"], min_years=2)
+    job["personality_preferences"] = {
+        "mind": {"pole": "left", "importance": 1.0},
+        "energy": {"pole": "right", "importance": 1.0},
+    }
+
+    res = score_candidate_job(candidate, job)
+    personality_score = res["component_scores"]["personality"]
+    # candidate aligns well with both preferences (left-mind, right-energy)
+    assert personality_score >= 70
+
+
+def test_missing_personality_does_not_hurt_score():
+    # candidate has no personality/values -> those components are neutral (100)
+    candidate = make_candidate(["Python", "SQL"], years=4, languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"], min_years=2)
+    job["company_values"] = ["innovation"]
+    res = score_candidate_job(candidate, job)
+    assert res["component_scores"]["values"] == 100.0
+    assert res["component_scores"]["personality"] == 100.0

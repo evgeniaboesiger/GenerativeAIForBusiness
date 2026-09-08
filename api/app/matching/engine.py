@@ -5,24 +5,28 @@ Ethical constraint: The engine explicitly avoids using protected attributes
 such as gender, age, nationality, ethnicity, religion, disability, or
 other sensitive attributes as factors in scoring. The algorithm is based
 solely on job-relevant professional attributes (skills, experience,
-education, languages, location, employment preferences, salary, career goals).
+education, languages, location, employment preferences, salary, career goals)
+plus personality fit and values alignment (both self-declared, optional).
 """
 from typing import Dict, Any, List, Tuple
 import time
 from math import floor
 
-ALGORITHM_VERSION = "1.0"
+ALGORITHM_VERSION = "1.1"
 
 # Component weights (sum to 100)
+# personality and values are optional self-declared fit dimensions (15 each)
 WEIGHTS = {
-    "skills": 30,
-    "experience": 20,
-    "education": 10,
-    "languages": 10,
-    "location": 10,
-    "employment": 10,
-    "salary": 5,
-    "career_goal": 5,
+    "skills": 21,
+    "experience": 14,
+    "education": 7,
+    "languages": 7,
+    "location": 7,
+    "employment": 7,
+    "salary": 4,
+    "career_goal": 3,
+    "personality": 15,
+    "values": 15,
 }
 
 
@@ -219,6 +223,78 @@ def compute_career_goal_score(candidate: Dict[str, Any], job: Dict[str, Any]) ->
     return 40.0
 
 
+def compute_values_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> Tuple[float, List[str]]:
+    """Score overlap between candidate's top values and the company's values.
+
+    candidate["values"]: list of value ids ordered by candidate priority.
+    job["company_values"]: list of company value ids.
+    """
+    candidate_values = candidate.get("values") or []
+    company_values = job.get("company_values") or []
+    if not company_values:
+        return 100.0, []
+    if not candidate_values:
+        # candidate hasn't completed the assessment yet -> neutral, not a penalty
+        return 100.0, []
+
+    company_set = set(company_values)
+    weight = 1.0
+    total = 0.0
+    max_possible = 0.0
+    matched = []
+    for cand in candidate_values:
+        max_possible += max(weight, 0)
+        if cand in company_set and weight > 0:
+            total += weight
+            matched.append(cand)
+        weight -= 0.15
+        if weight <= 0:
+            break
+
+    if max_possible == 0:
+        return 0.0, matched
+    return round((total / max_possible) * 100, 2), matched
+
+
+def compute_personality_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> Tuple[float, List[str]]:
+    """Score how well a candidate's personality fits a job's preferences.
+
+    candidate["personality"]: {"dimensions": {dim: {"score": 0..100, "pole": "left"|"right"}}, "type_code": ...}
+    job["personality_preferences"]: {dim: {"pole": "left"|"right", "importance": float}}
+    """
+    cand_personality = candidate.get("personality") or {}
+    pref = job.get("personality_preferences") or {}
+    if not pref:
+        return 100.0, []
+    dims = cand_personality.get("dimensions", {}) or {}
+    if not dims:
+        # candidate hasn't completed the assessment yet -> neutral, not a penalty
+        return 100.0, []
+
+    total = 0.0
+    weights = 0.0
+    matched = []
+    for dim_id, pref_entry in pref.items():
+        pole = pref_entry.get("pole")
+        importance = float(pref_entry.get("importance", 1.0))
+        cand = dims.get(dim_id, {}) or {}
+        score = cand.get("score", 50)
+        if pole is None:
+            fit = 1.0
+        else:
+            distance = ((100 - score) if pole == "right" else score) / 100.0
+            distance = max(0.0, distance)
+            fit = max(0.0, 1.0 - distance)
+        total += fit * importance
+        weights += importance
+        if fit >= 0.6:
+            matched.append(dim_id)
+
+    if weights == 0:
+        return 100.0, []
+    return round((total / weights) * 100, 2), matched
+
+
 def check_mandatory_requirements(candidate: Dict[str, Any], job: Dict[str, Any]) -> Tuple[bool, List[str]]:
     missing = []
     # languages
@@ -263,6 +339,8 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     employment_score = compute_employment_score(candidate, job)
     salary_score = compute_salary_score(candidate, job)
     career_goal_score = compute_career_goal_score(candidate, job)
+    values_score, matched_values = compute_values_score(candidate, job)
+    personality_score, matched_dims = compute_personality_score(candidate, job)
 
     # weighted overall
     components = {
@@ -274,6 +352,8 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         "employment": employment_score,
         "salary": salary_score,
         "career_goal": career_goal_score,
+        "values": values_score,
+        "personality": personality_score,
     }
 
     overall = 0.0
@@ -310,11 +390,19 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         strengths.append("Languages meet or exceed requirements")
     if salary_score >= 90:
         strengths.append("Salary expectation within range")
+    if values_score >= 80:
+        strengths.append("Values strongly align with the company")
+    if matched_values:
+        strengths.append(f"Shared values: {', '.join(matched_values)}")
+    if personality_score >= 80:
+        strengths.append("Personality fits the team culture")
 
     if missing_reasons:
         gaps.extend(missing_reasons)
     if experience_score < 50:
         gaps.append("Insufficient relevant experience")
+    if values_score < 40:
+        gaps.append("Values do not strongly align with the company")
 
     explanation_lines = []
     explanation_lines.extend(strengths)

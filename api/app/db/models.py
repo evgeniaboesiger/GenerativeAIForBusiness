@@ -28,6 +28,8 @@ class Candidate(Base):
     salary_max = Column(Integer)
     remote_preference = Column(String)
     career_goal = Column(Text)
+    personality = Column(JSONType)
+    values = Column(JSONType)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     experiences = relationship('Experience', back_populates='candidate', cascade='all, delete')
@@ -119,6 +121,8 @@ class Job(Base):
     education_requirements = Column(Text)
     required_certifications = Column(JSONType)
     nice_to_have_certifications = Column(JSONType)
+    company_values = Column(JSONType)
+    personality_preferences = Column(JSONType)
 
 
 class Match(Base):
