@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { PERSONALITY_DIMENSIONS } from '../../../lib/assessment';
 
 type ReviewStatus = 'extracted' | 'needs_review' | 'candidate_confirmed';
 type Provenance = {
@@ -239,6 +240,42 @@ export default function CandidateProfilePage() {
                 </span>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className="rounded-xl border bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Personality &amp; Values</h2>
+            <a href="/candidate/assessment" className="text-sm text-accent hover:underline">
+              Take / update assessment
+            </a>
+          </div>
+          <p className="text-sm text-slate-500 mb-4">
+            Your personality type and top values are matched against the culture and values of every job offer.
+          </p>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="border rounded-lg p-4">
+              <div className="text-sm text-slate-500 mb-2">Personality traits</div>
+              <div className="space-y-2">
+                {PERSONALITY_DIMENSIONS.map((dim) => (
+                  <div key={dim.id} className="flex justify-between text-sm">
+                    <span>{dim.label}</span>
+                    <span className="text-slate-500">—</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="border rounded-lg p-4">
+              <div className="text-sm text-slate-500 mb-2">Top values</div>
+              <div className="space-y-2">
+                {['—', '—', '—', '—', '—'].map((v, i) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-slate-400">Value {i + 1}</span>
+                    <span className="text-slate-400">—</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
       </div>
