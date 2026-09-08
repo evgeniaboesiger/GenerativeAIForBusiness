@@ -20,3 +20,7 @@ fraumatch/**/*.db
 
 # MATCHA - anonymized experiment telemetry (generated at runtime)
 fraumatch/data/match_telemetry.jsonl
+
+# FRAUMATCH api - generated demo database (seeded via scripts/seed_demo_data.py)
+api/*.db
+api/*.db-journal

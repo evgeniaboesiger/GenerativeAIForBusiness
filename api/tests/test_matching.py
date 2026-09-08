@@ -184,7 +184,9 @@ def test_values_overlap_scoring():
     values_score = res["component_scores"]["values"]
     # two of the candidate's top three values overlap
     assert 50 < values_score < 100
-    assert "Shared values" in res["strengths"] or True
+    # informational only - never used for a strength/gap or the score
+    assert "values" in res["informational_only"]
+    assert not any("alig" in s.lower() for s in res["strengths"] + res["gaps"])
 
 
 def test_personality_fit_scoring():
@@ -207,6 +209,8 @@ def test_personality_fit_scoring():
     personality_score = res["component_scores"]["personality"]
     # candidate aligns well with both preferences (left-mind, right-energy)
     assert personality_score >= 70
+    assert "personality" in res["informational_only"]
+    assert not any("culture" in s.lower() or "personality" in s.lower() for s in res["strengths"] + res["gaps"])
 
 
 def test_missing_personality_does_not_hurt_score():
@@ -217,3 +221,46 @@ def test_missing_personality_does_not_hurt_score():
     res = score_candidate_job(candidate, job)
     assert res["component_scores"]["values"] == 100.0
     assert res["component_scores"]["personality"] == 100.0
+
+
+def test_personality_and_values_do_not_affect_overall_score():
+    # Personality/values are informational only: their presence must never
+    # change the weighted overall score or the recommendation.
+    base_candidate = make_candidate(["Python"], years=3, languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"], min_years=2)
+
+    base = score_candidate_job(dict(base_candidate), job)
+
+    aligned = dict(base_candidate)
+    aligned["values"] = ["innovation", "integrity", "collaboration"]
+    aligned["personality"] = {
+        "dimensions": {
+            "mind": {"score": 95, "pole": "right", "confidence": 90},
+            "energy": {"score": 90, "pole": "right", "confidence": 80},
+            "nature": {"score": 50, "pole": "left", "confidence": 0},
+            "tactics": {"score": 50, "pole": "left", "confidence": 0},
+        }
+    }
+
+    misaligned = dict(base_candidate)
+    misaligned["values"] = ["profitability"]
+    misaligned["personality"] = {
+        "dimensions": {
+            "mind": {"score": 1, "pole": "left", "confidence": 90},
+            "energy": {"score": 1, "pole": "left", "confidence": 90},
+            "nature": {"score": 50, "pole": "left", "confidence": 0},
+            "tactics": {"score": 50, "pole": "left", "confidence": 0},
+        }
+    }
+
+    for job_prefs in ({"company_values": ["innovation"]},
+                      {"company_values": ["profitability"]},
+                      {"personality_preferences": {"mind": {"pole": "right", "importance": 1.0}}},):
+        job_with_extras = dict(job)
+        job_with_extras.update(job_prefs)
+        a = score_candidate_job(aligned, job_with_extras)
+        m = score_candidate_job(misaligned, job_with_extras)
+        assert a["overall_score"] == base["overall_score"]
+        assert m["overall_score"] == base["overall_score"]
+        assert a["recommendation"] == base["recommendation"]
+        assert m["recommendation"] == base["recommendation"]

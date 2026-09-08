@@ -5,29 +5,36 @@ Ethical constraint: The engine explicitly avoids using protected attributes
 such as gender, age, nationality, ethnicity, religion, disability, or
 other sensitive attributes as factors in scoring. The algorithm is based
 solely on job-relevant professional attributes (skills, experience,
-education, languages, location, employment preferences, salary, career goals)
-plus personality fit and values alignment (both self-declared, optional).
+education, languages, location, employment preferences, salary, career goals).
+
+Personality & values assessments are OPTIONAL and informational only: their
+scores are reported for the candidate to see but never weighted into the
+overall match score.
 """
 from typing import Dict, Any, List, Tuple
 import time
 from math import floor
 
-ALGORITHM_VERSION = "1.1"
+ALGORITHM_VERSION = "1.2"
 
 # Component weights (sum to 100)
-# personality and values are optional self-declared fit dimensions (15 each)
+# Personality & values are computed but intentionally NOT part of the score
+# (informational only), so the weights match the documented breakdown:
+# skills 30, experience 20, education 10, languages 10, location 10,
+# employment 10, salary 5, career goals 5.
 WEIGHTS = {
-    "skills": 21,
-    "experience": 14,
-    "education": 7,
-    "languages": 7,
-    "location": 7,
-    "employment": 7,
-    "salary": 4,
-    "career_goal": 3,
-    "personality": 15,
-    "values": 15,
+    "skills": 30,
+    "experience": 20,
+    "education": 10,
+    "languages": 10,
+    "location": 10,
+    "employment": 10,
+    "salary": 5,
+    "career_goal": 5,
 }
+
+# Component scores that are reported for transparency but do not affect ranking.
+INFORMATIONAL_ONLY = ("values", "personality")
 
 
 def _level_to_score(level: str) -> int:
@@ -342,7 +349,8 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     values_score, matched_values = compute_values_score(candidate, job)
     personality_score, matched_dims = compute_personality_score(candidate, job)
 
-    # weighted overall
+    # Weighted overall. Only the professional weights above are summed;
+    # personality & values live in component_scores but never affect the total.
     components = {
         "skills": skills_score,
         "experience": experience_score,
@@ -390,19 +398,11 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         strengths.append("Languages meet or exceed requirements")
     if salary_score >= 90:
         strengths.append("Salary expectation within range")
-    if values_score >= 80:
-        strengths.append("Values strongly align with the company")
-    if matched_values:
-        strengths.append(f"Shared values: {', '.join(matched_values)}")
-    if personality_score >= 80:
-        strengths.append("Personality fits the team culture")
 
     if missing_reasons:
         gaps.extend(missing_reasons)
     if experience_score < 50:
         gaps.append("Insufficient relevant experience")
-    if values_score < 40:
-        gaps.append("Values do not strongly align with the company")
 
     explanation_lines = []
     explanation_lines.extend(strengths)
@@ -426,6 +426,7 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         "explanation": "\n".join(explanation_lines),
         "execution_time_ms": execution_time_ms,
         "algorithm_version": ALGORITHM_VERSION,
+        "informational_only": list(INFORMATIONAL_ONLY),
     }
 
     return result

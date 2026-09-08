@@ -251,7 +251,7 @@ export default function CandidateProfilePage() {
             </a>
           </div>
           <p className="text-sm text-slate-500 mb-4">
-            Your personality type and top values are matched against the culture and values of every job offer.
+            Optional self-assessment. Your results are informational only and are never used to rank or filter job offers.
           </p>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="border rounded-lg p-4">

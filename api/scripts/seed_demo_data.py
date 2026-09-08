@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.db.models import (
     AIRun,
     Assessment,
+    Base,
     Candidate,
     Education,
     Experience,
@@ -27,6 +28,8 @@ from app.db.models import (
 
 def create_engine_and_session():
     engine = create_engine(settings.database_url, future=True)
+    # Ensure the schema exists if this is a fresh database.
+    Base.metadata.create_all(bind=engine)
     Session = sessionmaker(bind=engine, autoflush=False, autocommit=False)
     return engine, Session
 
@@ -62,8 +65,6 @@ COMPANY_VALUES_POOL = [
     "excellence", "autonomy", "agility", "growth", "security", "diversity",
     "work_life_balance", "impact", "profitability",
 ]
-
-PERSONALITY_DIMENSION_IDS = ["mind", "energy", "nature", "tactics"]
 
 
 def random_name():
@@ -148,21 +149,10 @@ def seed():
             salary_max=salary_max,
             remote_preference=remote_pref,
             career_goal=career_goal,
-            personality={
-                "dimensions": {
-                    dim: {
-                        "score": random.randint(15, 90),
-                        "pole": "right" if random.random() > 0.5 else "left",
-                        "confidence": random.randint(20, 80),
-                    }
-                    for dim in PERSONALITY_DIMENSION_IDS
-                },
-                "type_code": "",
-            },
-            values=[
-                {"value": v, "label": v, "score": round(100 - i * 5, 1)}
-                for i, v in enumerate(random.sample(COMPANY_VALUES_POOL, k=5))
-            ],
+            # Personality & values are optional and informational only: demo
+            # candidates start without them and take the assessment themselves.
+            personality=None,
+            values=[],
         )
         session.add(candidate)
         candidates.append(candidate)

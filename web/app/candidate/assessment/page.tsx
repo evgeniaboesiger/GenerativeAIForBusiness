@@ -66,9 +66,16 @@ export default function AssessmentPage() {
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <p className="text-sm uppercase tracking-wide text-slate-500">Candidate assessment</p>
+          <p className="text-sm uppercase tracking-wide text-slate-500">Optional self-assessment</p>
           <h1 className="text-3xl font-bold text-navy">Personality &amp; Values</h1>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-accent/40 bg-accent/5 p-4 mb-6 text-sm text-slate-600">
+        <strong>Optional and informational.</strong> Taking this assessment is your choice.
+        Your answers are shown only to you for self-reflection. They are
+        <strong> never used to rank, filter, or recommend jobs</strong> — your match score is based
+        exclusively on job-relevant professional attributes.
       </div>
 
       <div className="flex gap-2 mb-6">
@@ -166,8 +173,8 @@ export default function AssessmentPage() {
             </div>
           </div>
           <p className="text-sm text-slate-600 mb-6">
-            Rate how important each statement is to you. Your answers reveal which values matter most in a workplace,
-            and we match them against the values of companies offering jobs.
+            Rate how important each statement is to you. Your answers reveal which values matter most to you in a workplace.
+            Optional: companies can declare their values, and the alignment shown here is informational only.
           </p>
 
           <section className="card">
@@ -243,7 +250,7 @@ export default function AssessmentPage() {
               })}
             </div>
             <p className="text-sm text-slate-500 mt-3">
-              This type helps us suggest suitable work cultures — it is used only for alignment, never to filter you out unfairly.
+              For your information only — your type never affects your match scores or rankings.
             </p>
           </section>
 
@@ -264,7 +271,7 @@ export default function AssessmentPage() {
               ))}
             </div>
             <p className="text-sm text-slate-500 mt-3">
-              These are compared against the values each company declares to measure how well you align.
+              Shown for your information only — companies can declare their values, and this overlap is never weighted into your match score.
             </p>
           </section>
 
