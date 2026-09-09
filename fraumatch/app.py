@@ -10,6 +10,7 @@ import json
 import os
 import sys
 import io
+import copy
 
 # Add the agents directory to the path
 sys.path.append(os.path.join(os.path.dirname(__file__), "agents"))
@@ -585,6 +586,8 @@ def show_profile_page(sample_cvs, use_ai):
             st.session_state.current_profile = profile
             st.session_state.current_profile_source = source_label
             st.session_state.last_cv_text = cv_text
+            st.session_state.edit_profile_mode = False
+            st.session_state.edit_profile = None
             
             st.success("✅ Profile extracted successfully!")
             show_profile_results(profile)
@@ -598,10 +601,11 @@ def show_profile_page(sample_cvs, use_ai):
 
 
 def show_profile_results(profile):
-    """Display the extracted profile in a nice format."""
-    
+    """Display the extracted profile, with an edit mode so candidates can
+    correct or complete any information the CV extraction missed."""
+
     st.subheader("Extracted Candidate Profile")
-    
+
     # Check if there's an error
     if "error" in profile:
         st.error(profile.get("error", "Error extracting profile"))
@@ -609,115 +613,287 @@ def show_profile_results(profile):
             with st.expander("View raw response"):
                 st.code(profile["raw_response"])
         return
-    
+
+    editing = st.session_state.get("edit_profile_mode", False)
+
+    # Toggle edit mode
+    col_top, _ = st.columns([1, 3])
+    with col_top:
+        if not editing:
+            if st.button("✏️ Edit Profile", use_container_width=True):
+                st.session_state.edit_profile_mode = True
+                st.session_state.edit_profile = copy.deepcopy(profile)
+                st.rerun()
+        else:
+            if st.button("◀ Back to View", use_container_width=True):
+                st.session_state.edit_profile_mode = False
+                st.session_state.edit_profile = None
+                st.rerun()
+
+    if editing:
+        st.info("✏️ **Editing mode:** correct or complete any information that was "
+                "not extracted from your CV, then click **💾 Save Profile Changes** below.")
+        work = st.session_state.get("edit_profile") or copy.deepcopy(profile)
+    else:
+        work = profile
+
     # Personal info
-    personal = profile.get("personal_info", {})
+    personal = work.get("personal_info", {})
     st.markdown("### 👤 Personal Information")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.text_input("Name", value=personal.get("name", ""), disabled=True)
+        st.text_input("Name", value=personal.get("name", ""), disabled=not editing, key="pi_name")
     with col2:
-        st.text_input("Location", value=personal.get("location", ""), disabled=True)
+        st.text_input("Location", value=personal.get("location", ""), disabled=not editing, key="pi_location")
     with col3:
-        st.text_input("Email", value=personal.get("email", ""), disabled=True)
+        st.text_input("Email", value=personal.get("email", ""), disabled=not editing, key="pi_email")
     with col4:
-        st.text_input("Phone", value=personal.get("phone", ""), disabled=True)
-    
-    if profile.get("summary"):
+        st.text_input("Phone", value=personal.get("phone", ""), disabled=not editing, key="pi_phone")
+
+    # Summary
+    if work.get("summary") or editing:
         st.markdown("**Professional Summary:**")
-        st.write(profile["summary"])
-    
+        if editing:
+            st.text_area("Summary", value=work.get("summary", ""), key="summary_edit", label_visibility="collapsed")
+        else:
+            st.write(work["summary"])
+
     st.markdown("---")
-    
+
     # Work experience
     st.markdown("### 💼 Work Experience")
-    work_exp = profile.get("work_experience", [])
+    work_exp = work.get("work_experience", [])
+    if editing:
+        st.caption("Edit each role below, or use the buttons to add / remove entries.")
     if work_exp:
-        for exp in work_exp:
-            with st.container():
-                st.markdown(f"**{exp.get('title', 'Role')}** at *{exp.get('company', 'Company')}*")
-                st.caption(f"Duration: {exp.get('duration', 'N/A')}")
-                achievements = exp.get("key_achievements", [])
-                if achievements:
-                    for achievement in achievements[:3]:
-                        st.markdown(f"- {achievement}")
-                st.markdown("---")
+        for i, exp in enumerate(work_exp):
+            if editing:
+                col_t, col_c, col_d, col_del = st.columns([2, 2, 2, 1])
+                with col_t:
+                    st.text_input("Title", value=exp.get("title", ""), key=f"exp_title_{i}")
+                with col_c:
+                    st.text_input("Company", value=exp.get("company", ""), key=f"exp_company_{i}")
+                with col_d:
+                    st.text_input("Duration", value=exp.get("duration", ""), key=f"exp_duration_{i}")
+                with col_del:
+                    if st.button("🗑️", key=f"exp_del_{i}", help="Remove this entry"):
+                        work["work_experience"].pop(i)
+                        st.rerun()
+                achievements = "\n".join(exp.get("key_achievements", []))
+                st.text_area("Key achievements (one per line)", value=achievements,
+                             key=f"exp_achiev_{i}")
+            else:
+                with st.container():
+                    st.markdown(f"**{exp.get('title', 'Role')}** at *{exp.get('company', 'Company')}*")
+                    st.caption(f"Duration: {exp.get('duration', 'N/A')}")
+                    achievements = exp.get("key_achievements", [])
+                    if achievements:
+                        for achievement in achievements[:3]:
+                            st.markdown(f"- {achievement}")
+                    st.markdown("---")
     else:
         st.info("No work experience found.")
-    
+    if editing:
+        if st.button("➕ Add work experience", key="exp_add"):
+            work["work_experience"].append({"title": "", "company": "", "duration": "", "key_achievements": []})
+            st.rerun()
+
+    st.markdown("---")
+
     # Education
     st.markdown("### 🎓 Education")
-    education = profile.get("education", [])
+    education = work.get("education", [])
+    if editing:
+        st.caption("Edit each education entry below, or use the buttons to add / remove entries.")
     if education:
-        for edu in education:
-            st.markdown(f"**{edu.get('degree', 'Degree')}** - {edu.get('institution', 'Institution')} ({edu.get('year', '')})")
+        for i, edu in enumerate(education):
+            if editing:
+                col_deg, col_inst, col_year, col_del = st.columns([2, 2, 1, 1])
+                with col_deg:
+                    st.text_input("Degree", value=edu.get("degree", ""), key=f"edu_degree_{i}")
+                with col_inst:
+                    st.text_input("Institution", value=edu.get("institution", ""), key=f"edu_inst_{i}")
+                with col_year:
+                    st.text_input("Year", value=edu.get("year", ""), key=f"edu_year_{i}")
+                with col_del:
+                    if st.button("🗑️", key=f"edu_del_{i}", help="Remove this entry"):
+                        work["education"].pop(i)
+                        st.rerun()
+            else:
+                st.markdown(f"**{edu.get('degree', 'Degree')}** - {edu.get('institution', 'Institution')} ({edu.get('year', '')})")
     else:
         st.info("No education found.")
-    
+    if editing:
+        if st.button("➕ Add education", key="edu_add"):
+            work["education"].append({"degree": "", "institution": "", "year": ""})
+            st.rerun()
+
     st.markdown("---")
-    
+
     # Skills
     st.markdown("### 🔧 Skills")
-    skills = profile.get("skills", [])
-    if skills:
+    skills = work.get("skills", [])
+    if editing:
+        skills_text = ", ".join(skills)
+        st.text_input("Skills (comma-separated)", value=skills_text, key="skills_edit")
+        st.caption("Separate multiple skills with commas, e.g. Python, SQL, Project Management")
+    elif skills:
         # Display as tags
         skills_html = " ".join([f'<span style="background-color:#e0e0e0;padding:4px 8px;border-radius:4px;margin:2px;">{s}</span>' for s in skills])
         st.markdown(f"<div style='margin-bottom:10px;'>{skills_html}</div>", unsafe_allow_html=True)
     else:
         st.info("No skills found.")
-    
+
     # Languages
     st.markdown("### 🌍 Languages")
-    languages = profile.get("languages", [])
+    languages = work.get("languages", [])
+    if editing:
+        st.caption("Edit your languages and levels below, or use the buttons to add / remove entries.")
     if languages:
-        for lang in languages:
-            if isinstance(lang, dict):
-                st.markdown(f"- {lang.get('language', '')}: {lang.get('level', '')}")
+        for i, lang in enumerate(languages):
+            if editing:
+                col_lang, col_lvl, col_del = st.columns([2, 2, 1])
+                with col_lang:
+                    st.text_input("Language", value=lang.get("language", "") if isinstance(lang, dict) else "", key=f"lang_name_{i}")
+                with col_lvl:
+                    st.text_input("Level", value=lang.get("level", "") if isinstance(lang, dict) else "", key=f"lang_level_{i}")
+                with col_del:
+                    if st.button("🗑️", key=f"lang_del_{i}", help="Remove this entry"):
+                        work["languages"].pop(i)
+                        st.rerun()
             else:
-                st.markdown(f"- {lang}")
+                if isinstance(lang, dict):
+                    st.markdown(f"- {lang.get('language', '')}: {lang.get('level', '')}")
+                else:
+                    st.markdown(f"- {lang}")
     else:
         st.info("No languages found.")
-    
-    # Certifications
-    certs = profile.get("certifications", [])
-    if certs:
-        st.markdown("### 📜 Certifications")
-        for cert in certs:
-            st.markdown(f"- {cert}")
-    
-    # Preferences
-    prefs = profile.get("preferences", {})
-    if prefs:
-        st.markdown("### ⚙️ Preferences")
-        for key, value in prefs.items():
-            if value:
-                st.markdown(f"- **{key.replace('_', ' ').title()}:** {value}")
-    
-    # Career goals
-    if profile.get("career_goals"):
-        st.markdown("### 🎯 Career Goals")
-        st.write(profile["career_goals"])
-    
-    st.markdown("---")
-    st.info("💡 **Verification:** Please review all extracted information. You can correct any errors before proceeding to job matching.")
+    if editing:
+        if st.button("➕ Add language", key="lang_add"):
+            work["languages"].append({"language": "", "level": ""})
+            st.rerun()
 
-    # Save profile to the user's account (stored encrypted in the database)
-    if st.session_state.user:
-        existing_saved = load_profile(st.session_state.user["id"])
-        col_save, _ = st.columns([1, 2])
-        with col_save:
-            if st.button("💾 Save to my account", type="primary", use_container_width=True):
-                try:
-                    save_profile(
-                        st.session_state.user["id"],
-                        getattr(st.session_state, "last_cv_text", ""),
-                        profile
-                    )
-                    st.success("✅ Profile and CV saved securely to your account!")
-                except Exception as e:
-                    st.error(f"Could not save profile: {e}")
-        if existing_saved and existing_saved.get("profile"):
-            st.caption("📁 You already have a saved profile. Saving again will update it.")
+    # Certifications
+    certs = work.get("certifications", [])
+    if certs or editing:
+        st.markdown("### 📜 Certifications")
+        if editing:
+            certs_text = ", ".join(certs)
+            st.text_input("Certifications (comma-separated)", value=certs_text, key="certs_edit")
+            st.caption("Separate multiple certifications with commas, e.g. PMP, AWS Certified, CPA")
+        else:
+            for cert in certs:
+                st.markdown(f"- {cert}")
+
+    # Preferences
+    prefs = work.get("preferences", {})
+    if prefs or editing:
+        st.markdown("### ⚙️ Preferences")
+        if editing:
+            pref_keys = ["employment_type", "remote_preference", "location_constraint", "salary_expectation"]
+            pref_cols = st.columns(2)
+            for j, pk in enumerate(pref_keys):
+                with pref_cols[j % 2]:
+                    st.text_input(pk.replace("_", " ").title(),
+                                  value=prefs.get(pk, ""), key=f"pref_{pk}")
+        else:
+            for key, value in prefs.items():
+                if value:
+                    st.markdown(f"- **{key.replace('_', ' ').title()}:** {value}")
+
+    # Career goals
+    if editing or work.get("career_goals"):
+        st.markdown("### 🎯 Career Goals")
+        if editing:
+            st.text_area("Career goals", value=work.get("career_goals", ""),
+                         key="career_goals_edit", label_visibility="collapsed")
+        else:
+            st.write(work["career_goals"])
+
+    st.markdown("---")
+
+    if editing:
+        # Save edits back into the working profile
+        if st.button("💾 Save Profile Changes", type="primary", use_container_width=True):
+            edit = st.session_state.get("edit_profile") or copy.deepcopy(profile)
+
+            edit["personal_info"] = {
+                "name": st.session_state.get("pi_name", ""),
+                "location": st.session_state.get("pi_location", ""),
+                "email": st.session_state.get("pi_email", ""),
+                "phone": st.session_state.get("pi_phone", ""),
+            }
+            edit["summary"] = st.session_state.get("summary_edit", "")
+
+            skills_text = st.session_state.get("skills_edit", "") or ""
+            edit["skills"] = [s.strip() for s in skills_text.split(",") if s.strip()]
+            certs_text = st.session_state.get("certs_edit", "") or ""
+            edit["certifications"] = [c.strip() for c in certs_text.split(",") if c.strip()]
+
+            new_exp = []
+            for exp in edit.get("work_experience", []):
+                i = len(new_exp)
+                ach_text = st.session_state.get(f"exp_achiev_{i}", "") or ""
+                new_exp.append({
+                    "title": st.session_state.get(f"exp_title_{i}", ""),
+                    "company": st.session_state.get(f"exp_company_{i}", ""),
+                    "duration": st.session_state.get(f"exp_duration_{i}", ""),
+                    "key_achievements": [a.strip() for a in ach_text.split("\n") if a.strip()],
+                })
+            edit["work_experience"] = new_exp
+
+            new_edu = []
+            for edu in edit.get("education", []):
+                i = len(new_edu)
+                new_edu.append({
+                    "degree": st.session_state.get(f"edu_degree_{i}", ""),
+                    "institution": st.session_state.get(f"edu_inst_{i}", ""),
+                    "year": st.session_state.get(f"edu_year_{i}", ""),
+                })
+            edit["education"] = new_edu
+
+            new_langs = []
+            for lang in edit.get("languages", []):
+                i = len(new_langs)
+                new_langs.append({
+                    "language": st.session_state.get(f"lang_name_{i}", ""),
+                    "level": st.session_state.get(f"lang_level_{i}", ""),
+                })
+            edit["languages"] = new_langs
+
+            edit_prefs = edit.get("preferences", {})
+            for pk in ["employment_type", "remote_preference", "location_constraint", "salary_expectation"]:
+                edit_prefs[pk] = st.session_state.get(f"pref_{pk}", "")
+            edit["preferences"] = edit_prefs
+
+            edit["career_goals"] = st.session_state.get("career_goals_edit", "")
+
+            st.session_state.current_profile = edit
+            st.session_state.edit_profile_mode = False
+            st.session_state.edit_profile = None
+            st.success("✅ Profile updated successfully!")
+            st.rerun()
+    else:
+        st.info("💡 **Verification:** Please review all extracted information. "
+                "You can correct any errors by clicking **✏️ Edit Profile** before proceeding to job matching.")
+
+        # Save profile to the user's account (stored encrypted in the database)
+        if st.session_state.user:
+            existing_saved = load_profile(st.session_state.user["id"])
+            col_save, _ = st.columns([1, 2])
+            with col_save:
+                if st.button("💾 Save to my account", type="primary", use_container_width=True):
+                    try:
+                        save_profile(
+                            st.session_state.user["id"],
+                            getattr(st.session_state, "last_cv_text", ""),
+                            profile
+                        )
+                        st.success("✅ Profile and CV saved securely to your account!")
+                    except Exception as e:
+                        st.error(f"Could not save profile: {e}")
+            if existing_saved and existing_saved.get("profile"):
+                st.caption("📁 You already have a saved profile. Saving again will update it.")
 
 
 def show_matching_page(sample_jobs, use_ai):
