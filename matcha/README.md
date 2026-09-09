@@ -230,6 +230,7 @@ Run from the `matcha` folder. Tests cover the preference model & matching rules,
 - the assessment/recommendation engine (professional gap detection, language/experience gaps, admin & profile-completeness items, deduplication across jobs, priority ordering, and the ethical rules — no personality traits, no protected characteristics, no career-break penalty)
 - the document-processing OCR tool (`tests/test_document_tools.py`): fast PDF extraction, OCR fallback for image-based PDFs, graceful handling when the OCR engine is missing, and the Profile Agent integration
 - the account features (`tests/test_account.py`): editable display name, and submitting/tracking applications with their status
+- the tiered deal-breakers (`tests/test_preferences.py`): jobs that violate an Ideal/Acceptable/Deal-breaker tier are excluded from recommendations (hard constraint), with regression coverage that the AI-explanation code path really calls Ollama when it is available
 
 ---
 
@@ -254,9 +255,9 @@ matcha/
 │   ├── sample_jobs.json      # Demo job listings (with structured attributes)
 │   └── match_telemetry.jsonl # Generated at runtime (git-ignored)
 ├── tests/
-│   ├── test_preferences.py   # Automated tests (49 cases)
+│   ├── test_preferences.py   # Automated tests (64 cases)
 │   ├── test_assessment.py    # Assessment engine tests (15 cases)
-│   ├── test_document_tools.py# OCR tool tests (14 cases)
+│   ├── test_document_tools.py# OCR tool tests (17 cases)
 │   └── test_account.py       # Account: name editing + application tracking (5 cases)
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file

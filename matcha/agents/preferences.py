@@ -362,6 +362,107 @@ def _tier_summary_lines(tiers: Optional[Dict[str, Any]]) -> List[str]:
     return lines
 
 
+def _job_remote_arrangement_level(job: Dict[str, Any]) -> Optional[str]:
+    """Map a job's work arrangement to a canonical level (remote/hybrid/office)."""
+    arrangement = ""
+    if job.get("work_arrangement"):
+        arrangement = str(job["work_arrangement"])
+    else:
+        details = job.get("details") or {}
+        arrangement = str(details.get("remote_policy") or "")
+    arrangement = arrangement.strip().lower()
+    if not arrangement or arrangement in ("flexible", "flex"):
+        return None
+    if any(k in arrangement for k in ("fully remote", "mostly remote", "home office", "home-office", "remote")):
+        return "remote"
+    if "hybrid" in arrangement or "mixed" in arrangement:
+        return "hybrid"
+    if any(k in arrangement for k in ("onsite", "on-site", "office", "on site")):
+        return "office"
+    return None
+
+
+def _job_has_weekend_or_oncall(job: Dict[str, Any]) -> bool:
+    """Detect weekend / on-call requirements in a job listing.
+
+    Negation-aware: sentences like "no weekend work" or "rarely works weekends"
+    do not count. Detection is sentence-scoped so a negation only applies to
+    its own sentence.
+    """
+    fields = [str(job.get("description") or "")]
+    requirements = job.get("requirements") or {}
+    fields.append(" ".join(str(r) for r in requirements.get("mandatory", [])))
+    sentences = []
+    for field in fields:
+        lowered = field.lower().replace(";", ".").replace("!", ".")
+        sentences.extend(s.strip() for s in lowered.split(".") if s.strip())
+
+    positives = ("weekend", "saturday", "sunday", "24/7", "on-call", "on call", "shift work")
+    softeners = ("rare", "occasional", "seldom", "rarely", "sporad")
+
+    def _negated(sentence: str) -> bool:
+        if any(w in sentence for w in ("no ", "without", "not ", "never ")):
+            return True
+        if any(w in sentence for w in softeners):
+            return True
+        return False
+
+    return any(p in s and not _negated(s) for p in positives for s in sentences)
+
+
+def tier_violation_reasons(raw_prefs: Optional[Dict[str, Any]], job: Dict[str, Any]) -> List[str]:
+    """Return human-readable reasons why a job violates the candidate's tiered
+    deal-breakers (see ``normalise_preference_tiers``).
+
+    An empty list means no deal-breaker is violated. Dimensions without a
+    stored tier, and jobs with missing information, never count as violations
+    - a job without data is not unfairly filtered out.
+    """
+    tiers = (raw_prefs or {}).get("preference_tiers") or {}
+    if not tiers:
+        return []
+    reasons: List[str] = []
+
+    emp = tiers.get("employment_percentage")
+    if emp:
+        lo, hi = emp["deal_breaker"]
+        jmin, jmax = job.get("employment_pct_min"), job.get("employment_pct_max")
+        if jmin is not None or jmax is not None:
+            jmin = jmin if jmin is not None else 100
+            jmax = jmax if jmax is not None else 100
+            if jmax < lo or jmin > hi:
+                reasons.append(f"Workload of {jmin}–{jmax}% is outside your deal-breaker range of {lo}–{hi}%.")
+
+    sal = tiers.get("salary")
+    if sal:
+        floor, cap = sal["deal_breaker"]
+        jmin, jmax = job.get("salary_min"), job.get("salary_max")
+        if jmin is not None or jmax is not None:
+            if jmax is not None and jmax < floor:
+                reasons.append(f"Salary (max CHF {jmax:,}) is below your deal-breaker minimum of CHF {floor:,}.")
+            elif jmin is not None and jmin > cap:
+                reasons.append(f"Salary (from CHF {jmin:,}) is above your deal-breaker ceiling of CHF {cap:,}.")
+
+    cm = tiers.get("commute")
+    if cm:
+        limit = cm["deal_breaker_max_minutes"]
+        jcommute = job.get("commute_minutes")
+        if jcommute is not None and jcommute > limit:
+            reasons.append(f"The commute of about {jcommute} minutes exceeds your deal-breaker limit of {limit} minutes.")
+
+    rm = tiers.get("remote")
+    if rm:
+        level = _job_remote_arrangement_level(job)
+        if level and level in rm["deal_breaker"]:
+            reasons.append(f"{level.title()} work is one of your deal-breakers.")
+
+    wk = tiers.get("weekend")
+    if wk and wk.get("deal_breaker") and _job_has_weekend_or_oncall(job):
+        reasons.append("This position involves weekend or on-call work, which is a deal-breaker for you.")
+
+    return reasons
+
+
 # ---------------------------------------------------------------------- #
 #  Human-readable summary for the review step ("Review & Confirm")
 # ---------------------------------------------------------------------- #

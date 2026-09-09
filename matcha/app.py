@@ -238,8 +238,8 @@ def show_auth_page():
                 try:
                     user = register_user(reg_email, reg_password, full_name, role=role_value)
                     st.session_state.user = user
-                    st.success(tr("Welcome, {}! Please now log in with your new password.",
-                                  "Willkommen, {}! Bitte melden Sie sich nun mit Ihrem neuen Passwort an.").format(user['full_name']))
+                    st.success(tr("Welcome, {}! Your account was created and you are now logged in.",
+                                  "Willkommen, {}! Ihr Konto wurde erstellt und Sie sind jetzt angemeldet.").format(user['full_name']))
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
@@ -273,8 +273,8 @@ def show_auth_page():
 
     # Quick demo access (optional convenience - not real auth)
     st.markdown("---")
-    st.caption(tr("**Demo tip:** Create a test account to try registration, or use any email + password you make up for a quick login.",
-                  "**Demo-Tipp:** Legen Sie ein Testkonto an, um die Registrierung auszuprobieren, oder verwenden Sie eine beliebige E-Mail und ein beliebiges Passwort für einen schnellen Login."))
+    st.caption(tr("**Demo tip:** Create a test account to try registration.",
+                  "**Demo-Tipp:** Legen Sie ein Testkonto an, um die Registrierung auszuprobieren."))
 
 
 def show_account_page():

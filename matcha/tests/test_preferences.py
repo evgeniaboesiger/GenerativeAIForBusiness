@@ -503,3 +503,132 @@ def test_tiers_appear_in_summary():
     assert "100–120" in text or "120" in text
     assert "weekend" in text.lower()
     assert "CHF" in text
+
+
+# ---------------------------------------------------------------------- #
+#  Tiered deal-breakers are HARD CONSTRAINTS in the matching engine
+# ---------------------------------------------------------------------- #
+def _profile_with_tiers(tiers):
+    prefs = {"preference_tiers": p.normalise_preference_tiers(tiers)}
+    return make_profile(prefs=prefs)
+
+
+def test_employment_deal_breaker_rejects_job_and_lists_reason():
+    profile = _profile_with_tiers({
+        "employment_percentage": {"ideal": [80, 100], "acceptable": [60, 100], "deal_breaker": [100, 100]},
+    })
+    job60 = make_job(employment_pct_min=60, employment_pct_max=60)
+    job100 = make_job(employment_pct_min=100, employment_pct_max=100)
+    assert p.tier_violation_reasons(profile["preferences"], job60)
+    assert not p.tier_violation_reasons(profile["preferences"], job100)
+
+    match = agent.find_matches(profile, [job60], use_ai=False)[0]
+    assert match["mandatory_met"] is False
+    assert any("Deal-breaker" in c["text"] for c in match["preference_checks"])
+
+    match = agent.find_matches(profile, [job100], use_ai=False)[0]
+    assert match["mandatory_met"] is True
+
+
+def test_salary_deal_breaker_floor_rejects_job():
+    profile = _profile_with_tiers({
+        "salary": {"ideal": [120000, 180000], "acceptable": [100000, 200000], "deal_breaker": [100000, 250000]},
+    })
+    low = make_job(salary_min=55000, salary_max=65000)
+    ok = make_job(salary_min=100000, salary_max=120000)
+    assert p.tier_violation_reasons(profile["preferences"], low)
+    assert not p.tier_violation_reasons(profile["preferences"], ok)
+    assert agent.find_matches(profile, [low], use_ai=False)[0]["mandatory_met"] is False
+    assert agent.find_matches(profile, [ok], use_ai=False)[0]["mandatory_met"] is True
+
+
+def test_salary_deal_breaker_ceiling_rejects_overpaying_job():
+    profile = _profile_with_tiers({
+        "salary": {"ideal": [90000, 110000], "acceptable": [85000, 120000], "deal_breaker": [80000, 130000]},
+    })
+    over = make_job(salary_min=150000, salary_max=170000)
+    assert p.tier_violation_reasons(profile["preferences"], over)
+    assert agent.find_matches(profile, [over], use_ai=False)[0]["mandatory_met"] is False
+
+
+def test_commute_deal_breaker_rejects_long_commute():
+    profile = _profile_with_tiers({
+        "commute": {"ideal_max_minutes": 20, "acceptable_max_minutes": 30, "deal_breaker_max_minutes": 45},
+    })
+    long = make_job(commute_minutes=90)
+    short = make_job(commute_minutes=25)
+    assert p.tier_violation_reasons(profile["preferences"], long)
+    assert not p.tier_violation_reasons(profile["preferences"], short)
+    assert agent.find_matches(profile, [long], use_ai=False)[0]["mandatory_met"] is False
+    assert agent.find_matches(profile, [short], use_ai=False)[0]["mandatory_met"] is True
+
+
+def test_remote_deal_breaker_filters_office_jobs_only():
+    profile = _profile_with_tiers({
+        "remote": {"ideal": ["remote"], "acceptable": ["remote", "hybrid"], "deal_breaker": ["office"]},
+    })
+    office_job = make_job(work_arrangement="office")
+    hybrid_job = make_job(work_arrangement="hybrid")
+    assert p.tier_violation_reasons(profile["preferences"], office_job)
+    assert not p.tier_violation_reasons(profile["preferences"], hybrid_job)
+    assert agent.find_matches(profile, [office_job], use_ai=False)[0]["mandatory_met"] is False
+    assert agent.find_matches(profile, [hybrid_job], use_ai=False)[0]["mandatory_met"] is True
+
+
+def test_weekend_deal_breaker_is_negation_aware():
+    profile = _profile_with_tiers({
+        "weekend": {"ideal": False, "acceptable": True, "deal_breaker": True},
+    })
+    weekend_job = make_job(description="You will cover a weekend on-call rotation once a month.")
+    no_weekend_job = make_job(description="No weekend work: you are off on Saturdays and Sundays.")
+    assert p.tier_violation_reasons(profile["preferences"], weekend_job)
+    assert not p.tier_violation_reasons(profile["preferences"], no_weekend_job)
+    assert agent.find_matches(profile, [weekend_job], use_ai=False)[0]["mandatory_met"] is False
+    assert agent.find_matches(profile, [no_weekend_job], use_ai=False)[0]["mandatory_met"] is True
+
+
+def test_no_tiers_never_changes_recommendations():
+    profile = make_profile(prefs={"career_goals": ["Career advancement"]})
+    job = make_job(employment_pct_min=60, employment_pct_max=60)
+    assert not p.tier_violation_reasons(profile["preferences"], job)
+    assert agent.find_matches(profile, [job], use_ai=False)[0]["mandatory_met"] is True
+
+
+def test_missing_job_info_never_counts_as_violation():
+    profile = _profile_with_tiers({
+        "employment_percentage": {"ideal": [80, 100], "acceptable": [60, 100], "deal_breaker": [100, 100]},
+    })
+    sparse = make_job(employment_pct_min=None, employment_pct_max=None,
+                      salary_min=None, salary_max=None, commute_minutes=None, work_arrangement="")
+    assert not p.tier_violation_reasons(profile["preferences"], sparse)
+
+
+# ---------------------------------------------------------------------- #
+#  AI explanations really use the LLM when Ollama is available
+#  (regression: requests was used without being imported, so the AI path
+#   always fell back to the fast deterministic explanation)
+# ---------------------------------------------------------------------- #
+def test_ai_explanation_uses_ollama_when_available(monkeypatch):
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"response": "AI explanation generated by the model"}
+
+    class FakeRequests:
+        def __init__(self):
+            self.called = False
+
+        def post(self, *args, **kwargs):
+            self.called = True
+            return FakeResponse()
+
+    fake = FakeRequests()
+    monkeypatch.setattr("matching_agent.requests", fake)
+
+    profile = make_profile(prefs=None)
+    job = make_job()
+    explanation = agent._generate_ai_explanation(profile, job, score=0.85, pref_checks=[])
+    assert fake.called, "requests.post should be reached when Ollama is available"
+    assert "AI explanation generated" in explanation

@@ -13,6 +13,8 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+import requests
+
 from preferences import (
     career_goal_compatibility,
     commute_compatibility,
@@ -23,6 +25,7 @@ from preferences import (
     normalise_preferences,
     remote_compatibility,
     salary_compatibility,
+    tier_violation_reasons,
 )
 import telemetry
 
@@ -80,8 +83,11 @@ class MatchingAgent:
         first_relevant_rank: Optional[int] = None
 
         for job in jobs:
-            mandatory_met = self._check_mandatory_requirements(profile, job)
+            t_violations = tier_violation_reasons(profile.get("preferences") or {}, job)
+            mandatory_met = self._check_mandatory_requirements(profile, job) and not t_violations
             score, score_breakdown, pref_checks = self._calculate_score(profile, job)
+            if t_violations:
+                pref_checks = [{"status": "warn", "text": "Deal-breaker: " + r} for r in t_violations] + pref_checks
 
             explanation = ""
             if score > 0:
