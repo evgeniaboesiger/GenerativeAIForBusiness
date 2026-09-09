@@ -15,26 +15,56 @@ from typing import Dict, Any, List, Tuple
 import time
 from math import floor
 
-ALGORITHM_VERSION = "1.2"
+ALGORITHM_VERSION = "2.0"
 
-# Component weights (sum to 100)
-# Personality & values are computed but intentionally NOT part of the score
-# (informational only), so the weights match the documented breakdown:
-# skills 30, experience 20, education 10, languages 10, location 10,
-# employment 10, salary 5, career goals 5.
-WEIGHTS = {
-    "skills": 30,
-    "experience": 20,
+# --------------------------------------------------------------------------- #
+# Scoring model (see research: hard constraints -> fit buckets -> overall)
+#
+# Two layers:
+#   1. HARD CONSTRAINTS (deal-breakers) - if violated, the job is not
+#      recommended, regardless of score. Examples: salary floor, workload %,
+#      commute limit, mandatory languages/skills/education.
+#   2. FIT BUCKETS - three transparent components, shown separately:
+#      - professional_fit: skills 40, experience 25, languages 15,
+#        education 10, career direction 10
+#      - practical_fit: employment % 30, location/commute 25, remote 20,
+#        salary 20, availability 5
+#      - values_fit: candidate/company values overlap (informational only,
+#        NOT merged into the overall number - see note below).
+# --------------------------------------------------------------------------- #
+
+# Professional fit sub-weights (sum 100)
+PROFESSIONAL_WEIGHTS = {
+    "skills": 40,
+    "experience": 25,
+    "languages": 15,
     "education": 10,
-    "languages": 10,
-    "location": 10,
-    "employment": 10,
-    "salary": 5,
-    "career_goal": 5,
+    "career_goal": 10,
+}
+
+# Practical fit sub-weights (sum 100)
+PRACTICAL_WEIGHTS = {
+    "employment": 30,
+    "location": 25,
+    "remote": 20,
+    "salary": 20,
+    "availability": 5,
+}
+
+# Final overall blend. Values/personality are deliberately excluded: they are
+# reported for transparency (informational_only) but never weighted into the
+# single score, to preserve an earlier product decision and the ethical
+# principle that protected/behavioural traits do not drive ranking.
+FIT_WEIGHTS = {
+    "professional": 65,
+    "practical": 35,
 }
 
 # Component scores that are reported for transparency but do not affect ranking.
 INFORMATIONAL_ONLY = ("values", "personality")
+
+# Hard-constraint checks that gate a job out of the recommendation.
+HARD_CONSTRAINTS = ("salary", "employment_percentage", "commute", "weekend")
 
 
 def _level_to_score(level: str) -> int:
@@ -335,6 +365,101 @@ def check_mandatory_requirements(candidate: Dict[str, Any], job: Dict[str, Any])
     return (len(missing) == 0), missing
 
 
+# --------------------------------------------------------------------------- #
+# HARD CONSTRAINTS (deal-breakers) - beyond the existing mandatory gate
+# --------------------------------------------------------------------------- #
+def _job_employment_range(job: Dict[str, Any]) -> Tuple[int, int]:
+    """Resolve the job's employment percentage as a (min, max) range."""
+    jmin = job.get("employment_percentage_min")
+    jmax = job.get("employment_percentage_max")
+    single = job.get("employment_percentage")
+    if jmin is None:
+        jmin = single if single is not None else 100
+    if jmax is None:
+        jmax = single if single is not None else 100
+    return jmin, jmax
+
+
+def _job_has_weekend_work(job: Dict[str, Any]) -> bool:
+    """Detect weekend/on-call requirements from job description text."""
+    haystack = " ".join([
+        str(job.get("description") or ""),
+        str(job.get("requirements") or ""),
+    ]).lower()
+    return any(k in haystack for k in ["weekend", "saturday", "sunday", "24/7", "on-call", "shift work"])
+
+
+def check_hard_constraints(candidate: Dict[str, Any], job: Dict[str, Any],
+                           mandatory_met: bool, mandatory_reasons: List[str]) -> Tuple[bool, List[str]]:
+    """Return (passed, violations) for deal-breaker constraints.
+
+    Existing 'mandatory' gating (languages/skills/education) is combined with
+    new practical deal-breakers: salary floor, workload %, commute limit, and
+    weekend work. A single violation means the job is not recommended.
+    """
+    violations = list(mandatory_reasons) if not mandatory_met else []
+
+    # 1. Salary floor: candidate will not go below their minimum.
+    cmin = candidate.get("salary_expectation_min", 0)
+    jmax = job.get("salary_max")
+    if cmin and jmax is not None and cmin > jmax:
+        violations.append(
+            f"Salary deal-breaker: you need at least CHF {cmin:,}, "
+            f"but this job tops out at CHF {jmax:,}."
+        )
+
+    # 2. Workload %: candidate's required percentage must overlap the job's.
+    cmax = candidate.get("employment_percentage_max")
+    cmin_emp = candidate.get("employment_percentage_min")
+    jmin_emp, jmax_emp = _job_employment_range(job)
+    if cmax is not None and cmin_emp is not None:
+        if cmax < jmin_emp or cmin_emp > jmax_emp:
+            violations.append(
+                f"Workload deal-breaker: you're available for {cmin_emp}–{cmax}%, "
+                f"but this role requires {jmin_emp}–{jmax_emp}%."
+            )
+
+    # 3. Commute limit: job too far given the candidate's maximum commute.
+    commute = commute_minutes(candidate.get("location"), job.get("location"))
+    max_commute = candidate.get("maximum_commute_minutes")
+    if max_commute and max_commute < commute:
+        violations.append(
+            f"Commute deal-breaker: up to {max_commute} min commute is acceptable, "
+            f"but this role is ~{commute} min away."
+        )
+
+    # 4. Weekend / unsociable hours.
+    if _job_has_weekend_work(job):
+        violations.append("Scheduling deal-breaker: this role requires weekend or on-call work.")
+
+    return (len(violations) == 0), violations
+
+
+# --------------------------------------------------------------------------- #
+# FIT BUCKETS
+# --------------------------------------------------------------------------- #
+def compute_fit_buckets(components: Dict[str, float]) -> Dict[str, Any]:
+    """Fold the per-component scores into readable professional / practical /
+    values fit buckets, each on a 0-100 scale."""
+    def weight(weights, comps):
+        total = 0.0
+        for key, w in weights.items():
+            total += comps.get(key, 0) * (w / 100.0)
+        return round(total, 2)
+
+    professional = weight(PROFESSIONAL_WEIGHTS, components)
+    practical = weight(PRACTICAL_WEIGHTS, components)
+    values = components.get("values", 100.0)
+
+    return {
+        "professional": professional,
+        "practical": practical,
+        "values": round(values, 2),
+        "overall_weighted": round(professional * (FIT_WEIGHTS["professional"] / 100.0)
+                                  + practical * (FIT_WEIGHTS["practical"] / 100.0), 2),
+    }
+
+
 def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessments: List[Dict[str, Any]] = None) -> Dict[str, Any]:
     start = time.time()
     # compute component scores
@@ -364,17 +489,22 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         "personality": personality_score,
     }
 
-    overall = 0.0
-    for k, v in WEIGHTS.items():
-        overall += components.get(k, 0) * (v / 100.0)
-
-    overall = round(overall, 2)
-
     mandatory_met, missing_reasons = check_mandatory_requirements(candidate, job)
+    dealbreakers_met, dealbreaker_reasons = check_hard_constraints(
+        candidate, job, mandatory_met, missing_reasons
+    )
+
+    # Fit buckets: visible, interpretable components.
+    fit_buckets = compute_fit_buckets(components)
+    professional_fit = fit_buckets["professional"]
+    practical_fit = fit_buckets["practical"]
+    # The single blended score: only professional + practical fit (values &
+    # personality stay informational only). The recommendation keys off this
+    # blend together with the hard-constraint gate.
+    overall = fit_buckets["overall_weighted"]
 
     # category mapping
-    category = "Not recommended"
-    if not mandatory_met:
+    if not dealbreakers_met:
         category = "Not recommended"
     else:
         if overall >= 90:
@@ -398,16 +528,25 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         strengths.append("Languages meet or exceed requirements")
     if salary_score >= 90:
         strengths.append("Salary expectation within range")
+    if professional_fit >= 80:
+        strengths.append(f"Strong professional fit ({professional_fit}%)")
+    if practical_fit >= 80:
+        strengths.append(f"Strong practical fit ({practical_fit}%)")
 
-    if missing_reasons:
-        gaps.extend(missing_reasons)
+    if dealbreaker_reasons:
+        gaps.extend(dealbreaker_reasons)
+    if not mandatory_met and missing_reasons:
+        gaps.extend([r for r in missing_reasons if r not in gaps])
+    if overall < 60 and not dealbreaker_reasons:
+        gaps.append("Overall fit below recommended threshold")
     if experience_score < 50:
-        gaps.append("Insufficient relevant experience")
+        if "Insufficient relevant experience" not in gaps:
+            gaps.append("Insufficient relevant experience")
 
     explanation_lines = []
     explanation_lines.extend(strengths)
     if gaps:
-        explanation_lines.append("Gaps:")
+        explanation_lines.append("Gaps / deal-breakers:")
         explanation_lines.extend(gaps)
 
     end = time.time()
@@ -416,13 +555,20 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     result = {
         "candidate_id": candidate.get("id"),
         "job_id": job.get("id"),
+        # Two-layer model output: hard-constraint gate + fit buckets.
+        "hard_constraints_met": dealbreakers_met,
+        "hard_constraint_violations": dealbreaker_reasons,
+        "mandatory_requirements_met": mandatory_met,
+        "fit_buckets": fit_buckets,
+        "professional_fit": professional_fit,
+        "practical_fit": practical_fit,
+        "values_fit": fit_buckets["values"],
         "overall_score": overall,
         "category": category,
-        "mandatory_requirements_met": mandatory_met,
         "component_scores": components,
         "strengths": strengths,
         "gaps": gaps,
-        "recommendation": "Not recommended" if not mandatory_met or overall < 60 else "Recommended",
+        "recommendation": "Not recommended" if not dealbreakers_met or overall < 60 else "Recommended",
         "explanation": "\n".join(explanation_lines),
         "execution_time_ms": execution_time_ms,
         "algorithm_version": ALGORITHM_VERSION,

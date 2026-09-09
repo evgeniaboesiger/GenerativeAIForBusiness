@@ -264,3 +264,104 @@ def test_personality_and_values_do_not_affect_overall_score():
         assert m["overall_score"] == base["overall_score"]
         assert a["recommendation"] == base["recommendation"]
         assert m["recommendation"] == base["recommendation"]
+
+
+# --- P1: hard constraints + fit buckets ----------------------------------- #
+
+def test_salary_floor_below_job_range_blocks_recommendation():
+    # Candidate needs at least 90k but the job tops out at 85k -> deal-breaker.
+    candidate = make_candidate(["Python", "SQL"], salary_min=90000, salary_max=105000,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"], salary_min=70000, salary_max=85000)
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is False
+    assert res["recommendation"] == "Not recommended"
+    assert any("salary" in v.lower() or "tops out" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_salary_floor_not_blocking_when_job_can_pay():
+    candidate = make_candidate(["Python"], salary_min=80000, salary_max=90000,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"], salary_min=75000, salary_max=95000)
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+
+
+def test_workload_percentage_blocks_recommendation():
+    # Candidate is available only 50-80% but the role requires 100%.
+    candidate = make_candidate(["Python"], employment_min=50, employment_max=80,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"])
+    job["employment_percentage"] = 100
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is False
+    assert any("workload" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_overlapping_workload_passes():
+    candidate = make_candidate(["Python"], employment_min=80, employment_max=100,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"])
+    job["employment_percentage"] = 80
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+
+
+def test_commute_dealbreaker():
+    # Candidate max commute is 30 min, job is far away.
+    candidate = make_candidate(["Python"], location="Zurich",
+                               languages=[{"language": "German", "level": "C1"}])
+    candidate["maximum_commute_minutes"] = 30
+    job = make_job(["Python"], location="Bern")
+    res = score_candidate_job(candidate, job)
+    # Zurich->Bern is ~65+ min so it must be a deal-breaker
+    assert res["hard_constraints_met"] is False
+    assert any("commute" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_weekend_work_flags_dealbreaker():
+    candidate = make_candidate(["Python"], languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"])
+    job["description"] = "This role requires weekend and public holiday cover, including on-call duty."
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is False
+    assert any("weekend" in v.lower() or "on-call" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_fit_buckets_are_present_and_breakdown_visible():
+    candidate = make_candidate(["Python", "SQL", "React"], years=5,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python", "SQL"], preferred_skills=["React"], min_years=3)
+    res = score_candidate_job(candidate, job)
+    fb = res["fit_buckets"]
+    for key in ("professional", "practical", "values", "overall_weighted"):
+        assert key in fb
+    # professional and practical should be high for a strong match
+    assert fb["professional"] >= 80
+    # overall weighted is a number between 0 and 100
+    assert 0 <= fb["overall_weighted"] <= 100
+    # aliases exposed on the top-level result
+    assert res["professional_fit"] == fb["professional"]
+    assert res["practical_fit"] == fb["practical"]
+    assert res["values_fit"] == fb["values"]
+
+
+def test_values_still_not_merged_into_overall_under_fit_model():
+    # If values are absent they are neutral (100); with a present but
+    # misaligned value they must NOT change the overall score or recommendation.
+    candidate = make_candidate(["Python"], years=5, languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"], min_years=3)
+
+    base = score_candidate_job(dict(candidate), job)
+
+    misaligned = dict(candidate)
+    misaligned["values"] = ["profitability"]
+    job_mis = dict(job)
+    job_mis["company_values"] = ["innovation", "integrity"]
+    res = score_candidate_job(misaligned, job_mis)
+
+    assert res["overall_score"] == base["overall_score"]
+    assert res["recommendation"] == base["recommendation"]
+    # values_fit is reported for transparency but informational only
+    assert "values" in res["informational_only"]
+    assert res["values_fit"] < 100
