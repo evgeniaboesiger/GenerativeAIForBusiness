@@ -10,16 +10,16 @@ dist/
 /.vscode/
 
 # MATCHA - sensitive data must never be committed
-fraumatch/matcha_users.db
-fraumatch/.matcha_key
-fraumatch/*.db
-fraumatch/*.db-journal
-fraumatch/**/matcha_users.db
-fraumatch/**/.matcha_key
-fraumatch/**/*.db
+matcha/matcha_users.db
+matcha/.matcha_key
+matcha/*.db
+matcha/*.db-journal
+matcha/**/matcha_users.db
+matcha/**/.matcha_key
+matcha/**/*.db
 
 # MATCHA - anonymized experiment telemetry (generated at runtime)
-fraumatch/data/match_telemetry.jsonl
+matcha/data/match_telemetry.jsonl
 
 # FRAUMATCH api - generated demo database (seeded via scripts/seed_demo_data.py)
 api/*.db
