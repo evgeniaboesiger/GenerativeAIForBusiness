@@ -18,7 +18,7 @@ import json
 import os
 import secrets
 import sqlite3
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 # Paths (relative to this file's directory)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -148,6 +148,17 @@ def _create_tables(conn: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS submitted_applications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            job_id TEXT,
+            job_title TEXT NOT NULL,
+            company TEXT,
+            status TEXT NOT NULL DEFAULT 'under_review',
+            submitted_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         """
     )
     conn.commit()
@@ -211,6 +222,54 @@ def login_user(email: str, password: str) -> Optional[Dict[str, Any]]:
             "email": row["email"],
             "role": row["role"]
         }
+    finally:
+        conn.close()
+
+
+def update_user_name(user_id: int, full_name: str) -> None:
+    """Update the display name of an existing account."""
+    full_name = (full_name or "").strip()
+    if not full_name:
+        raise ValueError("Name cannot be empty.")
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE users SET full_name = ? WHERE id = ?", (full_name, user_id))
+        if cur.rowcount == 0:
+            raise ValueError("User not found.")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------- #
+#  Submitted applications (job + status tracked on the account page)
+# ---------------------------------------------------------------------- #
+def save_submitted_application(user_id: int, job: Dict[str, Any],
+                               status: str = "under_review") -> None:
+    """Record that the candidate submitted an application for a job."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT INTO submitted_applications (user_id, job_id, job_title, company, status) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (user_id, job.get("id"), job.get("title", ""), job.get("company", ""), status)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_submitted_applications(user_id: int) -> List[Dict[str, Any]]:
+    """Return the candidate's submitted applications, newest first."""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT job_id, job_title, company, status, submitted_at "
+            "FROM submitted_applications WHERE user_id = ? "
+            "ORDER BY submitted_at DESC, id DESC",
+            (user_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
     finally:
         conn.close()
 

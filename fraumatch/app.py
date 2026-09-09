@@ -18,8 +18,9 @@ from profile_agent import ProfileAgent
 from matching_agent import MatchingAgent
 from application_agent import ApplicationAgent
 from db import (
-    register_user, login_user, save_profile, load_profile, init_session,
-    get_connection, load_preferences, save_preferences
+    register_user, login_user, update_user_name, save_profile, load_profile,
+    save_submitted_application, load_submitted_applications,
+    init_session, get_connection, load_preferences, save_preferences
 )
 from telemetry import summary as telemetry_summary
 
@@ -140,6 +141,9 @@ def main():
         st.session_state.current_matches = []
         st.session_state.current_preferences = None
         st.session_state.pref_working = None
+        st.session_state.pop("account_name", None)
+        st.session_state.pop("editing_name", None)
+        st.session_state.pop("submitted_job_ids", None)
         st.rerun()
     st.sidebar.markdown("---")
 
@@ -274,18 +278,71 @@ def show_auth_page():
 
 
 def show_account_page():
-    """Show the user's saved data, allow loading a saved profile."""
+    """Show the user's saved data, allow editing the name, and track job applications."""
     user = st.session_state.user
     st.title(tr("🔐 My Account", "🔐 Mein Konto"))
     st.markdown("---")
 
     st.subheader(tr("Account details", "Kontodetails"))
+
+    # Editable display name - saved back to the account (email stays immutable).
+    editing_name = st.session_state.get("editing_name", False)
+    col1, col2, col3 = st.columns([3, 1, 1])
+    with col1:
+        name_value = st.text_input(tr("Name", "Name"),
+                                   value=user["full_name"],
+                                   key="account_name",
+                                   disabled=not editing_name)
+    with col2:
+        if not editing_name:
+            if st.button(tr("✏️ Edit", "✏️ Bearbeiten"), use_container_width=True, key="edit_name_btn"):
+                st.session_state.editing_name = True
+                st.rerun()
+        else:
+            if st.button(tr("💾 Save", "💾 Speichern"), use_container_width=True, key="save_name_btn", type="primary"):
+                new_name = (st.session_state.get("account_name") or "").strip()
+                if new_name:
+                    update_user_name(user["id"], new_name)
+                    st.session_state.user["full_name"] = new_name
+                    st.session_state.editing_name = False
+                    st.rerun()
+                else:
+                    st.error(tr("Name cannot be empty.", "Der Name darf nicht leer sein."))
+    with col3:
+        if editing_name:
+            if st.button(tr("Cancel", "Abbrechen"), use_container_width=True, key="cancel_name_btn"):
+                st.session_state.account_name = user["full_name"]
+                st.session_state.editing_name = False
+                st.rerun()
+
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input(tr("Name", "Name"), value=user["full_name"], disabled=True)
-    with col2:
         st.text_input(tr("Email", "E-Mail"), value=user["email"], disabled=True)
-    st.info(tr("Role: {}", "Rolle: {}").format('Candidate' if user['role'] == 'candidate' else 'Recruiter'))
+    with col2:
+        role_label = tr("Candidate", "Kandidatin") if user['role'] == 'candidate' else tr("Recruiter", "Recruiter:in")
+        st.text_input(tr("Role", "Rolle"), value=role_label, disabled=True)
+
+    st.markdown("---")
+
+    # Track submitted applications and their status (e.g., under review).
+    st.subheader(tr("📨 Submitted applications", "📨 Eingereichte Bewerbungen"))
+    applications = load_submitted_applications(user["id"])
+    if applications:
+        for app in applications:
+            col1, col2, col3 = st.columns([3, 2, 1])
+            with col1:
+                st.markdown(f"**{app['job_title']}**")
+                st.caption(app.get("company", ""))
+            with col2:
+                if app.get("status") == "under_review":
+                    st.markdown(tr("🟡 Under review", "🟡 In Prüfung"))
+                else:
+                    st.markdown(app.get("status", "").replace("_", " ").title())
+            with col3:
+                st.caption(app.get("submitted_at", ""))
+    else:
+        st.info(tr("No submitted applications yet. Approve an application on the **Application Agent** page to track its status here.",
+                   "Noch keine eingereichten Bewerbungen. Genehmigen Sie eine Bewerbung auf der Seite **Bewerbungsagent**, um ihren Status hier zu verfolgen."))
 
     st.markdown("---")
     st.subheader(tr("Saved profile & CV", "Gespeichertes Profil & CV"))
@@ -1417,7 +1474,15 @@ def show_application_page(sample_jobs, use_ai):
                                "📤 In einer echten Bereitstellung würde diese Bewerbung nun zur Prüfung an die Recruiterin gesendet. In dieser Demo erfolgt keine automatisierte E-Mail-Übermittlung."))
                     
                     if st.button(tr("🔒 Send to Recruiter Review (Demo)", "🔒 An Recruiter-Prüfung senden (Demo)")):
-                        st.success(tr("🎉 Application sent to Recruiter Review Queue!", "🎉 Bewerbung in die Recruiter-Prüfungswarteschlange gesendet!"))
+                        # Record the submission so it can be tracked on the My Account page.
+                        if "submitted_job_ids" not in st.session_state:
+                            st.session_state.submitted_job_ids = set()
+                        job_key = selected_job.get("id") or f"{selected_job['title']} - {selected_job['company']}"
+                        if job_key not in st.session_state.submitted_job_ids:
+                            save_submitted_application(st.session_state.user["id"], selected_job)
+                            st.session_state.submitted_job_ids.add(job_key)
+                        st.success(tr("🎉 Application sent to Recruiter Review Queue! You can track its status on the **My Account** page.",
+                                      "🎉 Bewerbung in die Recruiter-Prüfungswarteschlange gesendet! Sie können den Status auf der Seite **Mein Konto** verfolgen."))
                         st.markdown(tr("""
                         ### Next Steps in the Recruitment Process:
                         1. ✅ Application received

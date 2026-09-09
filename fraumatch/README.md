@@ -85,7 +85,7 @@ After logging in, the app has **7 pages** in the left sidebar:
 | **Job Matching** | Find matching jobs → ranked results with scores, explanations & preference checks |
 | **Areas to Improve** | A recommendation section based on your assessment: categorized **professional** and **administrative** areas to improve — see below |
 | **Application Agent** | Generate a tailored cover letter & application |
-| **My Account** | View your saved profile & preferences, reload them, see account details |
+| **My Account** | Edit your display name, view your saved profile & preferences, reload them, and track **submitted applications** with their status (e.g., 🟡 Under review) |
 
 > **AI mode toggle:** In the left sidebar you can turn on **🤖 AI mode**. It's **off by default** so the demo is instant and reliable. Turn it on (requires Ollama) to get AI-written explanations and cover letters.
 
@@ -229,6 +229,7 @@ python -m pytest tests/ -q
 Run from the `matcha` folder. Tests cover the preference model & matching rules, the ethical safeguards, **and**:
 - the assessment/recommendation engine (professional gap detection, language/experience gaps, admin & profile-completeness items, deduplication across jobs, priority ordering, and the ethical rules — no personality traits, no protected characteristics, no career-break penalty)
 - the document-processing OCR tool (`tests/test_document_tools.py`): fast PDF extraction, OCR fallback for image-based PDFs, graceful handling when the OCR engine is missing, and the Profile Agent integration
+- the account features (`tests/test_account.py`): editable display name, and submitting/tracking applications with their status
 
 ---
 
@@ -255,7 +256,8 @@ matcha/
 ├── tests/
 │   ├── test_preferences.py   # Automated tests (49 cases)
 │   ├── test_assessment.py    # Assessment engine tests (15 cases)
-│   └── test_document_tools.py# OCR tool tests (14 cases)
+│   ├── test_document_tools.py# OCR tool tests (14 cases)
+│   └── test_account.py       # Account: name editing + application tracking (5 cases)
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
