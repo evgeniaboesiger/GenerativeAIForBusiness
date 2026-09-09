@@ -381,7 +381,7 @@ def show_dashboard():
     cards = st.columns(3)
     for i, (page_name, page_desc) in enumerate(app_pages):
         with cards[i % 3]:
-            with st.container(border=True):
+            with st.container():
                 st.markdown(f"#### {page_name}")
                 st.markdown(page_desc)
                 if st.button(tr("Open", "Öffnen"), key=f"open_page_{i}"):
@@ -1163,8 +1163,8 @@ def show_assessment_page(sample_jobs):
     if professional:
         for item in professional:
             badge = {"high": tr("🔴 High", "🔴 Hoch"), "medium": tr("🟠 Medium", "🟠 Mittel"), "low": tr("🟡 Low", "🟡 Niedrig")}[item["priority"]]
-            with st.container(border=True):
-                st.markdown("**" + item["area"] + "** — `" + badge + "`")
+            with st.container():
+                st.markdown(f"**{item['area']}** — `{badge}`")
                 st.caption(item["detail"])
                 st.markdown(tr("→ **Suggestion:** {}", "→ **Vorschlag:** {}").format(item["action"]))
                 if item.get("source_jobs"):
@@ -1181,8 +1181,8 @@ def show_assessment_page(sample_jobs):
     if admin:
         for item in admin:
             badge = {"high": tr("🔴 High", "🔴 Hoch"), "medium": tr("🟠 Medium", "🟠 Mittel"), "low": tr("🟡 Low", "🟡 Niedrig")}[item["priority"]]
-            with st.container(border=True):
-                st.markdown("**" + item["area"] + "** — `" + badge + "`")
+            with st.container():
+                st.markdown(f"**{item['area']}** — `{badge}`")
                 st.caption(item["detail"])
                 st.markdown(tr("→ **Suggestion:** {}", "→ **Vorschlag:** {}").format(item["action"]))
     else:
@@ -1214,7 +1214,7 @@ def show_matches(matches, jobs=None, profile=None):
         else:
             color = "🟠"
 
-        with st.container(border=True):
+        with st.container():
             col1, col2 = st.columns([3, 1])
 
             with col1:
