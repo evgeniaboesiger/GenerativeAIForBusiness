@@ -12,6 +12,8 @@ import json
 import re
 from typing import Dict, Any, List
 
+from document_tools import extract_cv_text
+
 
 # Swiss locations and common keywords for extraction
 SWISS_CITIES = [
@@ -100,6 +102,36 @@ class ProfileAgent:
         }
 
         return profile
+
+    # ------------------------------------------------------------------ #
+    # Document entry point: fast text extraction with OCR fallback
+    # ------------------------------------------------------------------ #
+    def extract_profile_from_document(self,
+                                      document_bytes: bytes,
+                                      filename: str,
+                                      force_ocr: bool = False,
+                                      ocr_engine=None) -> tuple:
+        """Extract a structured profile from a raw document file.
+
+        Uses the document-processing TOOL (``document_tools``): fast text
+        extraction first, OCR only as a fallback when the document is
+        image-based or otherwise yields insufficient text. The extracted
+        profile is then built with ``extract_profile_main`` (no AI needed).
+
+        Returns ``(profile, meta)`` where ``meta`` describes how the text
+        was obtained (e.g. ``pdf_text`` vs ``pdf_ocr``), the character
+        count, and the plain-text transcript.
+        """
+        result = extract_cv_text(document_bytes, filename,
+                                 force_ocr=force_ocr, ocr_engine=ocr_engine)
+        profile = self.extract_profile_main(result.text)
+        meta = {
+            "text_source": result.source,
+            "characters": result.chars,
+            "ocr_used": result.ocr_used,
+            "transcript": result.text,
+        }
+        return profile, meta
 
     # ------------------------------------------------------------------ #
     # OPTIONAL AI extraction (with rule-based fallback)

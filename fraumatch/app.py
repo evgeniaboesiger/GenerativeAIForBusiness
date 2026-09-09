@@ -9,7 +9,6 @@ import streamlit as st
 import json
 import os
 import sys
-import io
 import copy
 
 # Add the agents directory to the path
@@ -33,66 +32,8 @@ from preferences_ui import show_preferences_page, get_active_preferences
 # Candidate assessment: areas to improve (professional + administrative)
 from assessment import RecommendationEngine
 
-# PDF and Word document text extraction
-try:
-    from pypdf import PdfReader
-except ImportError:
-    PdfReader = None
-
-try:
-    from docx import Document
-except ImportError:
-    Document = None
-
-def read_uploaded_file(uploaded_file) -> str:
-    """Extract text from an uploaded CV file (PDF, Word, or TXT)."""
-    import traceback
-
-    name = (uploaded_file.name or "").lower()
-    data = uploaded_file.getvalue()
-    try:
-        if name.endswith(".pdf"):
-            if PdfReader is None:
-                return tr("PDF support not installed. Add 'pypdf' to requirements.txt.",
-                          "PDF-Unterstützung ist nicht installiert. Fügen Sie 'pypdf' zu requirements.txt hinzu.")
-            reader = PdfReader(io.BytesIO(data))
-            text_parts = []
-            for page in reader.pages:
-                try:
-                    text_parts.append(page.extract_text() or "")
-                except Exception:
-                    text_parts.append("")
-            text = "\n".join(text_parts).strip()
-            if not text:
-                return tr("Could not extract text from this PDF. It may be a scanned document (image-based).",
-                          "Der Text konnte nicht aus dem PDF extrahiert werden. Möglicherweise handelt es sich um einen gescannten (bildbasierten) Beleg.")
-            return text
-        elif name.endswith(".docx"):
-            if Document is None:
-                return tr("Word (.docx) support not installed. Add 'python-docx' to requirements.txt.",
-                          "Word (.docx)-Unterstützung ist nicht installiert. Fügen Sie 'python-docx' zu requirements.txt hinzu.")
-            document = Document(io.BytesIO(data))
-            text_parts = []
-            for para in document.paragraphs:
-                if para.text.strip():
-                    text_parts.append(para.text.strip())
-            # Also pick up text from tables if present
-            for table in document.tables:
-                for row in table.rows:
-                    cells = [cell.text.strip() for cell in row.cells if cell.text.strip()]
-                    if cells:
-                        text_parts.append(" | ".join(cells))
-            text = "\n".join(text_parts).strip()
-            return text if text else tr("No text found in this Word document.",
-                                        "In diesem Word-Dokument wurde kein Text gefunden.")
-        elif name.endswith(".txt"):
-            return data.decode("utf-8", errors="replace").strip() or tr("Empty text file.", "Leere Textdatei.")
-        else:
-            return tr("Unsupported file type: {}. Please upload a .pdf, .docx, or .txt file.",
-                      "Nicht unterstützter Dateityp: {}. Bitte laden Sie eine .pdf-, .docx- oder .txt-Datei hoch.").format(uploaded_file.name)
-    except Exception as e:
-        traceback.print_exc()
-        return tr("Error reading file {}: {}", "Fehler beim Lesen der Datei {}: {}").format(uploaded_file.name, str(e))
+# CV text extraction (PDF / Word / TXT) lives in document_tools - a fast tool
+# used by the Profile Agent, with an OCR fallback for scanned / image PDFs.
 
 # Page configuration
 st.set_page_config(
@@ -653,6 +594,7 @@ def show_profile_page(sample_cvs, use_ai):
     
     cv_text = ""
     source_label = ""
+    uploaded_doc = None
 
     input_upload = tr("📁 Upload a CV file", "📁 CV-Datei hochladen")
     input_sample = tr("📄 Use a sample CV", "📄 Beispiel-CV verwenden")
@@ -666,15 +608,8 @@ def show_profile_page(sample_cvs, use_ai):
                     "Durch das Hochladen einer Datei kann Ihr CV für die Analyse extrahiert werden.")
         )
         if uploaded_file is not None:
-            with st.spinner(tr("Reading file...", "Datei wird gelesen...")):
-                cv_text = read_uploaded_file(uploaded_file)
-                source_label = f"📁 {uploaded_file.name}"
-            if cv_text:
-                st.info(tr("Loaded text from **{}** ({} characters)",
-                           "Text aus **{}** geladen ({} Zeichen)").format(uploaded_file.name, len(cv_text)))
-            else:
-                st.warning(tr("No text could be read from this file.",
-                              "Aus dieser Datei konnte kein Text gelesen werden."))
+            uploaded_doc = {"name": uploaded_file.name, "data": uploaded_file.getvalue()}
+            st.caption(tr("Ready: **{}**", "Bereit: **{}**").format(uploaded_file.name))
 
     elif input_mode == input_sample:
         use_sample = st.selectbox(
@@ -704,12 +639,46 @@ def show_profile_page(sample_cvs, use_ai):
     with col1:
         extract_button = st.button(tr("🔍 Extract Profile", "🔍 Profil extrahieren"), type="primary", use_container_width=True)
 
-    if extract_button and cv_text:
-        with st.spinner(tr("Profile Agent is analyzing your CV...", "Der Profil-Agent analysiert Ihren Lebenslauf...")):
-            # Use the Profile Agent (fast deterministic extraction - always works)
-            profile_agent = ProfileAgent()
-            profile = profile_agent.extract_profile_main(cv_text)
+    if extract_button:
+        profile = None
+        warned = False
 
+        if uploaded_doc is not None:
+            with st.spinner(tr("Profile Agent is extracting text and analyzing your CV...",
+                               "Der Profil-Agent extrahiert den Text und analysiert Ihren Lebenslauf...")):
+                profile_agent = ProfileAgent()
+                profile, meta = profile_agent.extract_profile_from_document(uploaded_doc["data"], uploaded_doc["name"])
+                cv_text = meta["transcript"]
+                source_label = f"📁 {uploaded_doc['name']}"
+            if cv_text:
+                ocr_note = tr(" · OCR applied (image-based PDF)", " · OCR angewendet (bildbasiertes PDF)") if meta["ocr_used"] else ""
+                st.info(tr("Loaded text from **{}** ({} characters).", "Text aus **{}** geladen ({} Zeichen).").format(uploaded_doc['name'], meta["characters"]) + ocr_note)
+            elif meta["text_source"] == "pdf_ocr_missing":
+                warned = True
+                st.info(tr("This PDF appears to be scanned (image-based), but the OCR tool is not available. Install Tesseract plus 'pytesseract' and 'pymupdf' (see README) to extract scanned CVs.",
+                           "Dieses PDF scheint gescannt zu sein (bildbasiert), aber das OCR-Tool ist nicht verfügbar. Installieren Sie Tesseract sowie 'pytesseract' und 'pymupdf' (siehe README), um gescannte Lebensläufe zu extrahieren."))
+            elif meta["text_source"] == "pdf_empty":
+                warned = True
+                st.warning(tr("Could not extract text from this PDF. It may be corrupt or image-based.",
+                              "Der Text konnte nicht aus dem PDF extrahiert werden. Es könnte beschädigt oder bildbasiert sein."))
+            elif meta["text_source"] == "unsupported":
+                warned = True
+                st.warning(tr("Unsupported file type. Please upload a .pdf, .docx, or .txt file.",
+                              "Nicht unterstützter Dateityp. Bitte laden Sie eine .pdf-, .docx- oder .txt-Datei hoch."))
+            elif meta["text_source"] in ("pdf_pkg_missing", "docx_pkg_missing"):
+                warned = True
+                st.warning(tr("Document support is not installed. Check requirements.txt (pypdf, python-docx).",
+                              "Die Dokumentunterstützung ist nicht installiert. Überprüfen Sie requirements.txt (pypdf, python-docx)."))
+            else:
+                warned = True
+                st.warning(tr("No text could be read from this file.",
+                              "Aus dieser Datei konnte kein Text gelesen werden."))
+        elif cv_text:
+            with st.spinner(tr("Profile Agent is analyzing your CV...", "Der Profil-Agent analysiert Ihren Lebenslauf...")):
+                profile_agent = ProfileAgent()
+                profile = profile_agent.extract_profile_main(cv_text)
+
+        if profile is not None:
             # Store in session
             st.session_state.current_profile = profile
             st.session_state.current_profile_source = source_label
@@ -719,10 +688,9 @@ def show_profile_page(sample_cvs, use_ai):
 
             st.success(tr("✅ Profile extracted successfully!", "✅ Profil erfolgreich extrahiert!"))
             show_profile_results(profile)
-
-    elif extract_button and not cv_text:
-        st.warning(tr("No CV provided. Please upload a file, select a sample, or paste CV text.",
-                      "Kein Lebenslauf angegeben. Bitte laden Sie eine Datei hoch, wählen Sie ein Beispiel oder fügen Sie CV-Text ein."))
+        elif not warned:
+            st.warning(tr("No CV provided. Please upload a file, select a sample, or paste CV text.",
+                          "Kein Lebenslauf angegeben. Bitte laden Sie eine Datei hoch, wählen Sie ein Beispiel oder fügen Sie CV-Text ein."))
 
     # Show existing profile if available
     elif st.session_state.current_profile:

@@ -80,7 +80,7 @@ After logging in, the app has **7 pages** in the left sidebar:
 | Page | What it does |
 |------|--------------|
 | **Dashboard** | "What you can do in MATCHA" shortcut cards to every page, matching weights, project overview, and the matching-efficiency experiment |
-| **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
+| **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction. Scanned PDFs are read with an OCR fallback (see below) |
 | **Career Goals** | Onboarding wizard for explicit work preferences (employment %, salary, location, remote, career goals…) — see below |
 | **Job Matching** | Find matching jobs → ranked results with scores, explanations & preference checks |
 | **Areas to Improve** | A recommendation section based on your assessment: categorized **professional** and **administrative** areas to improve — see below |
@@ -98,6 +98,25 @@ The app currently ships with **English** (default) and **German**. You can switc
 3. The whole interface updates immediately — navigation, buttons, and messages
 
 A new language can be added in `i18n.py` (register it in `SUPPORTED_LANGUAGES` and add the translations next to each `tr(...)` call).
+
+---
+
+## 📄 CV Parsing Reliability (OCR fallback)
+
+A scanned CV (PDF made of images, not text) has no text layer, so normal PDF extraction returns too little — or nothing. MATCHA handles this with an **OCR tool used by the Profile Agent** (it is a supporting *tool*, not a separate AI agent):
+
+- Every uploaded PDF is first read with **fast text extraction** (`pypdf`)
+- If the result is clearly insufficient (too short / no real text), the app **only then** runs **OCR**: pages are rendered with PyMuPDF and read with **Tesseract** (`pytesseract`)
+- The extracted text then flows into the exact same **deterministic Profile Agent** extraction — no extra AI cost and no extra processing on normal PDFs
+- The app tells you which path was used, e.g. *"· OCR applied (image-based PDF)"*
+
+**Works out of the box for normal PDFs, Word and TXT files.** To enable OCR for scanned PDFs, install the optional system tool **Tesseract**:
+
+- **Windows:** download the installer from https://github.com/UB-Mannheim/tesseract/wiki → install → add `C:\Program Files\Tesseract-OCR` to your PATH, then restart the terminal
+- **Codespaces / Ubuntu:** run `sudo apt install tesseract-ocr tesseract-ocr-deu`
+- The Python side needs no extra step — `pytesseract` + `pymupdf` are already in `requirements.txt`
+
+Without Tesseract, MATCHA keeps working normally and simply shows a hint that OCR is unavailable for scanned PDFs.
 
 ---
 
@@ -207,7 +226,9 @@ The preference model, matching rules and ethical safeguards are covered by a tes
 python -m pytest tests/ -q
 ```
 
-Run from the `matcha` folder. Tests cover the preference model & matching rules, the ethical safeguards, **and the assessment/recommendation engine** (professional gap detection, language/experience gaps, admin & profile-completeness items, deduplication across jobs, priority ordering, and the ethical rules — no personality traits, no protected characteristics, no career-break penalty).
+Run from the `matcha` folder. Tests cover the preference model & matching rules, the ethical safeguards, **and**:
+- the assessment/recommendation engine (professional gap detection, language/experience gaps, admin & profile-completeness items, deduplication across jobs, priority ordering, and the ethical rules — no personality traits, no protected characteristics, no career-break penalty)
+- the document-processing OCR tool (`tests/test_document_tools.py`): fast PDF extraction, OCR fallback for image-based PDFs, graceful handling when the OCR engine is missing, and the Profile Agent integration
 
 ---
 
@@ -220,6 +241,7 @@ matcha/
 ├── preferences_ui.py         # Career Goals & Preferences onboarding wizard
 ├── agents/
 │   ├── profile_agent.py      # Agent 1: CV → Structured Profile
+│   ├── document_tools.py     # CV text extraction TOOL + OCR fallback for scanned PDFs
 │   ├── matching_agent.py     # Agent 2: Deterministic Job Matching
 │   ├── application_agent.py  # Agent 3: Tailored Applications
 │   ├── preferences.py        # Structured preference model + compatibility rules
@@ -232,7 +254,8 @@ matcha/
 │   └── match_telemetry.jsonl # Generated at runtime (git-ignored)
 ├── tests/
 │   ├── test_preferences.py   # Automated tests (49 cases)
-│   └── test_assessment.py    # Assessment engine tests (15 cases)
+│   ├── test_assessment.py    # Assessment engine tests (15 cases)
+│   └── test_document_tools.py# OCR tool tests (14 cases)
 ├── requirements.txt          # Python dependencies
 └── README.md                 # This file
 ```
@@ -248,6 +271,7 @@ matcha/
 5. **AI for Explanation** — The LLM explains matches in plain language
 6. **Preferences, not Personality** — Only explicit, job-relevant preferences are collected; no psychological assessments, and no automatic rejections based on salary or employment expectations
 7. **Data Minimization** — Optional questions are optional, preference data is encrypted, and is used only for employment matching
+8. **Reliable CV Parsing** — Scanned PDFs are read with an OCR *tool* (not a separate agent) that only runs when fast text extraction clearly fails, so processing time and AI cost stay low
 
 ---
 
