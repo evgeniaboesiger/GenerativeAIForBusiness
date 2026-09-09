@@ -1277,7 +1277,9 @@ def show_matches(matches, jobs=None, profile=None):
             # Select job button
             if mandatory_met:
                 if st.button(tr("📝 Select this Job", "📝 Diesen Job auswählen"), key=f"select_{match['job_id']}", type="primary"):
-                    st.session_state.selected_job = match
+                    # Carry the FULL job object (not just the match summary) so the
+                    # Application Agent can show description/details and generate materials.
+                    st.session_state.selected_job = job_by_id.get(match["job_id"]) or match
                     st.success(tr("Selected: {} at {}", "Ausgewählt: {} bei {}").format(match['job_title'], match['company']))
                     st.info(tr("Go to **Application Agent** to generate your application materials.",
                                "Gehen Sie zum **Bewerbungsagenten**, um Ihre Bewerbungsunterlagen zu erstellen."))
@@ -1306,8 +1308,26 @@ def show_application_page(sample_jobs, use_ai):
     for job in sample_jobs:
         label = f"{job['title']} - {job['company']}"
         job_options[label] = job
-    
-    selected_label = st.selectbox(tr("Choose a job:", "Wählen Sie einen Job:"), list(job_options.keys()))
+
+    labels = list(job_options.keys())
+
+    # Preselect the job chosen on the Job Matching page (if any), so the
+    # candidate's selected role carries over instead of defaulting to the
+    # first job in the list.
+    preselected_label = None
+    carried_job = st.session_state.get("selected_job")
+    if isinstance(carried_job, dict) and carried_job.get("id"):
+        for label in labels:
+            if job_options[label]["id"] == carried_job["id"]:
+                preselected_label = label
+                break
+
+    index = labels.index(preselected_label) if preselected_label else 0
+    selected_label = st.selectbox(tr("Choose a job:", "Wählen Sie einen Job:"), labels, index=index)
+
+    if preselected_label:
+        st.caption(tr("👆 This job was selected on the **Job Matching** page.",
+                      "👆 Dieser Job wurde auf der Seite **Job-Matching** ausgewählt."))
     
     if selected_label:
         selected_job = job_options[selected_label]
