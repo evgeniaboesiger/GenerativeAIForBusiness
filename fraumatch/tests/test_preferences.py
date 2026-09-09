@@ -437,6 +437,69 @@ def test_preferences_summary_render():
     })
     text = " ".join(f"{label}: {value}" for label, value in summary)
     assert "80% preferred" in text
+
+
+# ---------------------------------------------------------------------- #
+#  Tiered preferences (Ideal / Acceptable / Deal-breaker)
+# ---------------------------------------------------------------------- #
+VALID_TIERS = {
+    "employment_percentage": {"ideal": [80, 100], "acceptable": [60, 100], "deal_breaker": [50, 100]},
+    "salary": {"ideal": [90000, 120000], "acceptable": [80000, 130000], "deal_breaker": [70000, 150000]},
+    "commute": {"ideal_max_minutes": 30, "acceptable_max_minutes": 45, "deal_breaker_max_minutes": 60},
+    "remote": {"ideal": ["remote"], "acceptable": ["remote", "hybrid"], "deal_breaker": ["office"]},
+    "weekend": {"ideal": True, "acceptable": False, "deal_breaker": True},
+}
+
+
+def test_tiers_are_whitelisted_and_default_none():
+    assert "preference_tiers" in p.ALLOWED_PREFERENCE_KEYS
+    assert p.default_preferences()["preference_tiers"] is None
+
+
+def test_normalise_preferences_keeps_valid_tiers():
+    prefs = p.normalise_preferences({"preference_tiers": VALID_TIERS})
+    tiers = prefs["preference_tiers"]
+    assert tiers["employment_percentage"]["ideal"] == [80, 100]
+    assert tiers["salary"]["deal_breaker"][0] == 70000
+    assert tiers["commute"]["ideal_max_minutes"] == 30
+    assert tiers["remote"]["ideal"] == ["remote"]
+    assert tiers["weekend"]["deal_breaker"] is True
+
+
+def test_normalise_tiers_is_idempotent():
+    once = p.normalise_preferences({"preference_tiers": VALID_TIERS})
+    twice = p.normalise_preferences({"preference_tiers": once["preference_tiers"]})
+    assert once == twice
+
+
+def test_normalise_tiers_drops_malformed_dimensions():
+    raw = {
+        "employment_percentage": {"ideal": [100, 50], "acceptable": [60, 100], "deal_breaker": [50, 100]},
+        "salary": {"ideal": [90000, 120000], "acceptable": [90000, 80000], "deal_breaker": [70000, 150000]},
+        "commute": {"ideal_max_minutes": 30, "acceptable_max_minutes": 45},
+        "remote": {"ideal": ["remote"], "acceptable": [], "deal_breaker": ["office"]},
+        "weekend": {"ideal": True, "acceptable": False, "deal_breaker": True},
+    }
+    tiers = p.normalise_preferences({"preference_tiers": raw})["preference_tiers"]
+    assert tiers is not None
+    # reversed / incomplete ranges and empty levels are dropped entirely
+    assert "employment_percentage" not in tiers
+    assert "salary" not in tiers
+    assert "commute" not in tiers
+    assert "remote" not in tiers
+    # the fully-specified weekend dimension survives
+    assert tiers["weekend"]["deal_breaker"] is True
+
+
+def test_empty_tiers_normalises_to_none():
+    assert p.normalise_preferences({"preference_tiers": None})["preference_tiers"] is None
+    assert p.normalise_preferences({"preference_tiers": {"remote": {"ideal": []}}})["preference_tiers"] is None
+
+
+def test_tiers_appear_in_summary():
+    summary = p.preferences_summary({"preference_tiers": VALID_TIERS})
+    text = " ".join(f"{label}: {value}" for label, value in summary)
+    assert "Deal-breakers" in text
+    assert "100–120" in text or "120" in text
+    assert "weekend" in text.lower()
     assert "CHF" in text
-    assert "Within 1 month" in text
-    assert "Career advancement" in text

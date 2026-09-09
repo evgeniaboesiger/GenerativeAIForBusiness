@@ -95,6 +95,12 @@ WORK_VALUE_ITEMS = [
 
 PREFERENCE_SCALE = (1, 5)
 
+# Tiers use the same schema as the API matching engine (Ideal/Acceptable/
+# Deal-breaker). `None` means "not set": the dimension is then ignored by the
+# matching engine and falls back to scalar preferences.
+TIER_DIMENSIONS = ("employment_percentage", "salary", "commute", "remote", "weekend")
+TIER_REMOTE_LEVELS = ("remote", "hybrid", "office")
+
 
 def default_preferences() -> Dict[str, Any]:
     """
@@ -132,6 +138,8 @@ def default_preferences() -> Dict[str, Any]:
 
         "preferred_working_languages": [],         # list e.g. ["German", "English"]
         "availability": None,
+
+        "preference_tiers": None,                  # tiered Ideal/Acceptable/Deal-breaker
     }
 
 
@@ -183,6 +191,8 @@ def normalise_preferences(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             prefs[key] = int(value) if isinstance(value, (int, float)) and value > 0 else (int(value) if str(value).strip().isdigit() else None)
         elif key == "remote_importance":
             prefs[key] = int(max(1, min(5, value if isinstance(value, (int, float)) else 3)))
+        elif key == "preference_tiers":
+            prefs[key] = normalise_preference_tiers(value)
 
     # Keep employment bounds consistent (swap if reversed).
     lo, hi = prefs["preferred_employment_min"], prefs["preferred_employment_max"]
@@ -204,6 +214,152 @@ def _to_pct(value: Any) -> Optional[int]:
         return None
     s = s.replace("%", "")
     return int(s) if s.isdigit() and 20 <= int(s) <= 100 else None
+
+
+# ---------------------------------------------------------------------- #
+#  Tiered preferences (Ideal / Acceptable / Deal-breaker)
+# ---------------------------------------------------------------------- #
+def _tier_range_pair(value: Any) -> Optional[Tuple[int, int]]:
+    """Parse a [lo, hi] range; both ends must be integers with lo <= hi."""
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    lo = _to_pct(value[0]) if value[0] is not None else None
+    hi = _to_pct(value[1]) if value[1] is not None else None
+    if lo is None or hi is None or lo > hi:
+        return None
+    return (lo, hi)
+
+
+def _tier_salary_pair(value: Any) -> Optional[Tuple[int, int]]:
+    if not isinstance(value, (list, tuple)) or len(value) != 2:
+        return None
+    try:
+        lo, hi = int(value[0]), int(value[1])
+    except (TypeError, ValueError):
+        return None
+    if lo < 0 or hi < 0 or lo > hi:
+        return None
+    return (lo, hi)
+
+
+def _tier_remote_levels(value: Any) -> List[str]:
+    """Normalise a raw remote tier value into canonical levels."""
+    if not isinstance(value, list):
+        return []
+    normalized = []
+    for v in value:
+        s = str(v).strip().lower()
+        if s in ("remote", "fully remote", "mostly remote"):
+            normalized.append("remote")
+        elif s in ("hybrid",):
+            normalized.append("hybrid")
+        elif s in ("office", "fully office", "mostly office", "onsite", "on-site"):
+            normalized.append("office")
+    return list(dict.fromkeys(normalized))
+
+
+def normalise_preference_tiers(raw: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """
+    Validate and normalise the tiered-preference structure.
+
+    Canonical schema (matches the API matching engine):
+        {
+          "employment_percentage": {"ideal": [lo, hi], "acceptable": [lo, hi], "deal_breaker": [lo, hi]},
+          "salary":                {"ideal": [lo, hi], "acceptable": [lo, hi], "deal_breaker": [lo, hi]},
+          "commute":               {"ideal_max_minutes": int, "acceptable_max_minutes": int,
+                                    "deal_breaker_max_minutes": int},
+          "remote":                {"ideal": [levels], "acceptable": [levels], "deal_breaker": [levels]},
+          "weekend":               {"ideal": bool, "acceptable": bool, "deal_breaker": bool},
+        }
+
+    Only fully-specified dimensions are kept; malformed ones are dropped so the
+    engine falls back to scalar preferences for that dimension.
+    """
+    if not isinstance(raw, dict) or not raw:
+        return None
+    tiers: Dict[str, Any] = {}
+
+    EMP_TIERS = ("ideal", "acceptable", "deal_breaker")
+    for key in ("employment_percentage", "salary"):
+        dim = raw.get(key)
+        if not isinstance(dim, dict):
+            continue
+        parser = _tier_range_pair if key == "employment_percentage" else _tier_salary_pair
+        cleaned = {}
+        ok = True
+        for t in EMP_TIERS:
+            pair = parser(dim.get(t))
+            if pair is None:
+                ok = False
+            else:
+                cleaned[t] = list(pair)
+        if ok:
+            tiers[key] = cleaned
+
+    cm = raw.get("commute")
+    if isinstance(cm, dict):
+        cleaned = {}
+        for tier in ("ideal_max_minutes", "acceptable_max_minutes", "deal_breaker_max_minutes"):
+            try:
+                v = int(cm.get(tier))
+            except (TypeError, ValueError):
+                v = -1
+            if 0 <= v <= 600:
+                cleaned[tier] = v
+        if len(cleaned) == 3:
+            tiers["commute"] = cleaned
+
+    rm = raw.get("remote")
+    if isinstance(rm, dict):
+        cleaned = {t: _tier_remote_levels(rm.get(t)) for t in EMP_TIERS}
+        if all(len(cleaned[t]) > 0 for t in EMP_TIERS):
+            tiers["remote"] = cleaned
+
+    wk = raw.get("weekend")
+    if isinstance(wk, dict) and "deal_breaker" in wk:
+        tiers["weekend"] = {
+            "ideal": bool(wk.get("ideal", False)),
+            "acceptable": bool(wk.get("acceptable", False)),
+            "deal_breaker": bool(wk.get("deal_breaker", True)),
+        }
+
+    return tiers or None
+
+
+def _tier_summary_lines(tiers: Optional[Dict[str, Any]]) -> List[str]:
+    """Human-readable tier lines used by the Review / saved summary step."""
+    if not tiers:
+        return []
+    lines = []
+
+    if "employment_percentage" in tiers:
+        t = tiers["employment_percentage"]
+        lines.append(f"Workload: ideal {t['ideal'][0]}–{t['ideal'][1]}%, "
+                     f"acceptable {t['acceptable'][0]}–{t['acceptable'][1]}%, "
+                     f"deal-breaker outside {t['deal_breaker'][0]}–{t['deal_breaker'][1]}%")
+    if "salary" in tiers:
+        t = tiers["salary"]
+        lines.append(f"Salary: ideal CHF {t['ideal'][0]:,}–{t['ideal'][1]:,}, "
+                     f"acceptable CHF {t['acceptable'][0]:,}–{t['acceptable'][1]:,}, "
+                     f"deal-breaker below CHF {t['deal_breaker'][0]:,}")
+    if "commute" in tiers:
+        t = tiers["commute"]
+        lines.append(f"Commute: ideal ≤ {t['ideal_max_minutes']} min, "
+                     f"acceptable ≤ {t['acceptable_max_minutes']} min, "
+                     f"deal-breaker beyond {t['deal_breaker_max_minutes']} min")
+    if "remote" in tiers:
+        def fmt(levels):
+            return ", ".join(l.title() for l in levels)
+        t = tiers["remote"]
+        lines.append(f"Remote: ideal {fmt(t['ideal'])}, acceptable {fmt(t['acceptable'])}, "
+                     f"deal-breaker {fmt(t['deal_breaker'])}")
+    if "weekend" in tiers:
+        t = tiers["weekend"]
+        if t.get("deal_breaker"):
+            lines.append("Weekend work: not acceptable (deal-breaker)")
+        else:
+            lines.append("Weekend work: acceptable on occasion")
+    return lines
 
 
 # ---------------------------------------------------------------------- #
@@ -261,6 +417,11 @@ def preferences_summary(prefs: Dict[str, Any]) -> List[Tuple[str, str]]:
     important_values = [label for key, label in WORK_VALUE_ITEMS
                         if p.get("work_values", {}).get(key, 0) >= 4]
     lines.append(("Important work values", ", ".join(important_values) if important_values else "None stated"))
+
+    tier_lines = _tier_summary_lines(p.get("preference_tiers"))
+    if tier_lines:
+        lines.append(("Deal-breakers (Ideal/Acceptable/Deal-breaker)",
+                      " | ".join(tier_lines)))
 
     return lines
 

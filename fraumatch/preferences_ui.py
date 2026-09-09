@@ -41,7 +41,8 @@ STEP_NAMES = {
     "work_style": "Step 3 · Work Preferences",
     "location": "Step 4 · Location & Remote Work",
     "salary": "Step 5 · Salary & Employment",
-    "review": "Step 6 · Review & Confirm",
+    "tiers": "Step 6 · Set Your Deal-Breakers",
+    "review": "Step 7 · Review & Confirm",
 }
 
 STEP_NAMES_DE = {
@@ -49,7 +50,8 @@ STEP_NAMES_DE = {
     "work_style": "Schritt 3 · Arbeitspräferenzen",
     "location": "Schritt 4 · Standort & Remote-Arbeit",
     "salary": "Schritt 5 · Gehalt & Anstellung",
-    "review": "Schritt 6 · Prüfen & Bestätigen",
+    "tiers": "Schritt 6 · Ihre Ausschlusskriterien festlegen",
+    "review": "Schritt 7 · Prüfen & Bestätigen",
 }
 
 
@@ -167,10 +169,10 @@ def _show_onboarding_flow(user):
     st.markdown(tr(
         "**Onboarding flow:** ① *Professional Profile (Candidate Profile page)* → "
         "② Career Goals → ③ Work Preferences → ④ Location & Remote → "
-        "⑤ Salary & Employment → ⑥ Review & Confirm",
+        "⑤ Salary & Employment → ⑥ Set Your Deal-Breakers → ⑦ Review & Confirm",
         "**Onboarding-Ablauf:** ① *Berufliches Profil (Seite Kandidatenprofil)* → "
         "② Karriereziele → ③ Arbeitspräferenzen → ④ Standort & Remote → "
-        "⑤ Gehalt & Anstellung → ⑥ Prüfen & Bestätigen"
+        "⑤ Gehalt & Anstellung → ⑥ Ausschlusskriterien festlegen → ⑦ Prüfen & Bestätigen"
     ))
     st.markdown("---")
 
@@ -188,6 +190,8 @@ def _show_onboarding_flow(user):
         _step_location()
     elif step == "salary":
         _step_salary()
+    elif step == "tiers":
+        _step_tiers()
     elif step == "review":
         _step_review(user)
 
@@ -459,7 +463,207 @@ def _step_salary():
     )
     _set_value("availability", availability)
 
-    _nav_buttons(next_step="review", back_step="location")
+    _nav_buttons(next_step="tiers", back_step="location")
+
+
+# ---------------------------------------------------------------------- #
+#  Tiered preferences step (Ideal / Acceptable / Deal-breaker)
+# ---------------------------------------------------------------------- #
+def _tier_dim(dim: str):
+    """Current tier value for a dimension, or None when not set."""
+    t = (_working().get("preference_tiers") or {}).get(dim)
+    return t if isinstance(t, dict) else None
+
+
+def _set_tier_dim(dim: str, value):
+    """Store (or clear) one tier dimension in the working copy."""
+    w = _working()
+    tiers = dict(w.get("preference_tiers") or {})
+    if value:
+        tiers[dim] = value
+    else:
+        tiers.pop(dim, None)
+    w["preference_tiers"] = tiers or None
+
+
+def _emp_label(v) -> str:
+    return "Flexible" if v is None else f"{v}%"
+
+
+def _step_tiers():
+    st.markdown(tr(
+        "**Optionally set your deal-breakers for each dimension.** For every "
+        "factor below you can define an *ideal* range, an *acceptable* range, "
+        "and what is a hard *deal-breaker*. Jobs that violate a deal-breaker "
+        "are not recommended to you.",
+        "**Optional: Legen Sie Ihre Ausschlusskriterien für jede Dimension fest.** "
+        "Für jeden Faktor unten können Sie einen *idealen* Bereich, einen "
+        "*akzeptablen* Bereich und ein hartes *Ausschlusskriterium* definieren. "
+        "Jobs, die ein Ausschlusskriterium verletzen, werden Ihnen nicht empfohlen.")
+    )
+    st.caption(tr("All options are optional - leave a dimension off and it will not restrict your matches.",
+                  "Alle Angaben sind optional - lassen Sie eine Dimension weg, schränkt sie Ihre Matches nicht ein."))
+    st.markdown("---")
+
+    # 1) Workload (employment percentage)
+    key_prefix = "tiers_emp"
+    on = st.checkbox(
+        tr("⚖️ Set workload (employment percentage) tiers", "⚖️ Arbeitszeit (Anstellungsgrad) festlegen"),
+        value=bool(_tier_dim("employment_percentage")),
+        key=key_prefix + "_on",
+    )
+    if on:
+        existing = _tier_dim("employment_percentage") or {
+            "ideal": [80, 100], "acceptable": [60, 100], "deal_breaker": [50, 100]}
+        col_ideal, col_acc, col_db = st.columns(3)
+        tiers_out = {}
+        for label, col, tier_name, default in [
+            (tr("Ideal", "Ideal"), col_ideal, "ideal", existing.get("ideal", [80, 100])),
+            (tr("Acceptable", "Akzeptabel"), col_acc, "acceptable", existing.get("acceptable", [60, 100])),
+            (tr("Deal-breaker (outside this range)", "Ausschlusskriterium (außerhalb dieses Bereichs)"), col_db, "deal_breaker", existing.get("deal_breaker", [50, 100])),
+        ]:
+            with col:
+                st.markdown(f"**{label}**")
+                lo_lbl = _emp_label(default[0])
+                hi_lbl = _emp_label(default[1])
+                lo_idx = EMPLOYMENT_LEVELS.index(lo_lbl) if lo_lbl in EMPLOYMENT_LEVELS else 0
+                hi_idx = EMPLOYMENT_LEVELS.index(hi_lbl) if hi_lbl in EMPLOYMENT_LEVELS else len(EMPLOYMENT_LEVELS) - 1
+                lo = st.selectbox(tr("min", "min"), EMPLOYMENT_LEVELS, index=lo_idx, key=f"{key_prefix}_{tier_name}_lo")
+                hi = st.selectbox(tr("max", "max"), EMPLOYMENT_LEVELS, index=hi_idx, key=f"{key_prefix}_{tier_name}_hi")
+                lo_v, hi_v = _pct_from_label(lo), _pct_from_label(hi)
+                if lo_v is not None and hi_v is not None and lo_v <= hi_v:
+                    tiers_out[tier_name] = [lo_v, hi_v]
+        _set_tier_dim("employment_percentage", tiers_out if len(tiers_out) == 3 else None)
+    else:
+        _set_tier_dim("employment_percentage", None)
+
+    st.markdown("---")
+
+    # 2) Salary (annual, CHF)
+    key_prefix = "tiers_sal"
+    on = st.checkbox(
+        tr("💰 Set salary tiers (CHF, annual)", "💰 Gehalt festlegen (CHF, jährlich)"),
+        value=bool(_tier_dim("salary")),
+        key=key_prefix + "_on",
+    )
+    if on:
+        existing = _tier_dim("salary") or {
+            "ideal": [90000, 120000], "acceptable": [80000, 130000], "deal_breaker": [70000, 150000]}
+        col_ideal, col_acc, col_db = st.columns(3)
+        tiers_out = {}
+        for label, col, tier_name, default in [
+            (tr("Ideal", "Ideal"), col_ideal, "ideal", existing.get("ideal", [90000, 120000])),
+            (tr("Acceptable", "Akzeptabel"), col_acc, "acceptable", existing.get("acceptable", [80000, 130000])),
+            (tr("Minimum you need", "Ihr Mindestgehalt"), col_db, "deal_breaker", existing.get("deal_breaker", [70000, 150000])),
+        ]:
+            with col:
+                st.markdown(f"**{label}**")
+                lo = st.number_input(tr("min", "min"), min_value=0, max_value=1000000, step=5000,
+                                     value=int(default[0]), key=f"{key_prefix}_{tier_name}_lo")
+                hi = st.number_input(tr("max", "max"), min_value=0, max_value=1000000, step=5000,
+                                     value=int(default[1]), key=f"{key_prefix}_{tier_name}_hi")
+                if lo <= hi:
+                    tiers_out[tier_name] = [lo, hi]
+        _set_tier_dim("salary", tiers_out if len(tiers_out) == 3 else None)
+    else:
+        _set_tier_dim("salary", None)
+
+    st.markdown("---")
+
+    # 3) Commute
+    key_prefix = "tiers_comm"
+    on = st.checkbox(
+        tr("🚆 Set commute tiers", "🚆 Pendelzeit festlegen"),
+        value=bool(_tier_dim("commute")),
+        key=key_prefix + "_on",
+    )
+    if on:
+        existing = _tier_dim("commute") or {
+            "ideal_max_minutes": 30, "acceptable_max_minutes": 45, "deal_breaker_max_minutes": 60}
+        col_ideal, col_acc, col_db = st.columns(3)
+        tiers_out = {}
+        for label, col, tier_name, default in [
+            (tr("Ideal", "Ideal"), col_ideal, "ideal_max_minutes", existing.get("ideal_max_minutes", 30)),
+            (tr("Acceptable", "Akzeptabel"), col_acc, "acceptable_max_minutes", existing.get("acceptable_max_minutes", 45)),
+            (tr("Deal-breaker (max)", "Ausschlusskriterium (max)"), col_db, "deal_breaker_max_minutes", existing.get("deal_breaker_max_minutes", 60)),
+        ]:
+            with col:
+                st.markdown(f"**{label}**")
+                pct = st.number_input(tr("minutes", "Minuten"), min_value=5, max_value=180, step=5,
+                                      value=int(default), key=f"{key_prefix}_{tier_name}")
+                tiers_out[tier_name] = int(pct)
+        _set_tier_dim("commute", tiers_out if len(tiers_out) == 3 else None)
+    else:
+        _set_tier_dim("commute", None)
+
+    st.markdown("---")
+
+    # 4) Remote work
+    key_prefix = "tiers_rem"
+    on = st.checkbox(
+        tr("🏠 Set remote-work tiers", "🏠 Remote-Arbeit festlegen"),
+        value=bool(_tier_dim("remote")),
+        key=key_prefix + "_on",
+    )
+    REMOTE_TIER_OPTS = [tr("Remote", "Remote"), tr("Hybrid", "Hybrid"), tr("Office", "Präsenz")]
+    REMOTE_OPT_TO_LEVEL = {o: lvl for o, lvl in zip(REMOTE_TIER_OPTS, ("remote", "hybrid", "office"))}
+    REMOTE_LEVEL_TO_OPT = {lvl: o for o, lvl in REMOTE_OPT_TO_LEVEL.items()}
+    if on:
+        existing = _tier_dim("remote") or {
+            "ideal": ["remote"], "acceptable": ["remote", "hybrid"], "deal_breaker": ["office"]}
+        col_ideal, col_acc, col_db = st.columns(3)
+        tiers_out = {}
+        for label, col, tier_name, default in [
+            (tr("Ideal", "Ideal"), col_ideal, "ideal", existing.get("ideal", ["remote"])),
+            (tr("Acceptable", "Akzeptabel"), col_acc, "acceptable", existing.get("acceptable", ["remote", "hybrid"])),
+            (tr("Deal-breaker", "Ausschlusskriterium"), col_db, "deal_breaker", existing.get("deal_breaker", ["office"])),
+        ]:
+            with col:
+                st.markdown(f"**{label}**")
+                default_opts = [REMOTE_LEVEL_TO_OPT[lvl] for lvl in default if lvl in REMOTE_LEVEL_TO_OPT]
+                sel = st.multiselect(tr("arrangement", "Arbeitsform"), REMOTE_TIER_OPTS,
+                                     default=default_opts, key=f"{key_prefix}_{tier_name}")
+                levels = [REMOTE_OPT_TO_LEVEL[o] for o in sel if o in REMOTE_OPT_TO_LEVEL]
+                if levels:
+                    tiers_out[tier_name] = levels
+        _set_tier_dim("remote", tiers_out if len(tiers_out) == 3 else None)
+    else:
+        _set_tier_dim("remote", None)
+
+    st.markdown("---")
+
+    # 5) Weekend / on-call
+    key_prefix = "tiers_wk"
+    on = st.checkbox(
+        tr("🗓️ Set weekend / on-call work deal-breaker", "🗓️ Wochenend-/Bereitschaftsarbeit festlegen"),
+        value=bool(_tier_dim("weekend")),
+        key=key_prefix + "_on",
+    )
+    if on:
+        existing = _tier_dim("weekend") or {"ideal": False, "acceptable": True, "deal_breaker": True}
+        avoid = st.radio(
+            tr("Do you prefer to avoid weekend or on-call work?",
+               "Möchten Sie Wochenend- oder Bereitschaftsarbeit vermeiden?"),
+            [tr("No preference", "Keine Präferenz"), tr("I prefer to avoid it", "Ich möchte es vermeiden")],
+            index=1 if existing.get("ideal") else 0,
+            key=key_prefix + "_avoid",
+        )
+        db_breaker = st.checkbox(
+            tr("Weekend or on-call work is a deal-breaker for me (I would reject such roles)",
+               "Wochenend- oder Bereitschaftsarbeit ist für mich ein Ausschlusskriterium (solche Rollen lehne ich ab)"),
+            value=bool(existing.get("deal_breaker", True)),
+            key=key_prefix + "_db",
+        )
+        _set_tier_dim("weekend", {
+            "ideal": avoid == tr("I prefer to avoid it", "Ich möchte es vermeiden"),
+            "acceptable": True,
+            "deal_breaker": db_breaker,
+        })
+    else:
+        _set_tier_dim("weekend", None)
+
+    st.markdown("---")
+    _nav_buttons(next_step="review", back_step="salary")
 
 
 def _step_review(user):
@@ -484,7 +688,7 @@ def _step_review(user):
     with col1:
         if st.button(tr("← Back", "← Zurück"), use_container_width=True):
             _persist_widgets()
-            st.session_state.pref_wizard_step = "salary"
+            st.session_state.pref_wizard_step = "tiers"
             st.rerun()
     with col2:
         if st.button(tr("💾 Confirm & Save", "💾 Bestätigen & Speichern"), type="primary", use_container_width=True, disabled=not consent):
