@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import Any, Dict
 from app.db import session as db_session
 from app.db import models
 from app.matching.engine import score_candidate_job
@@ -103,6 +104,52 @@ def get_candidate(candidate_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/api/candidates/{candidate_id}/preferences")
+def get_candidate_preferences(candidate_id: int, db: Session = Depends(get_db)):
+    c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+    return {
+        "candidate_id": c.id,
+        "preference_tiers": getattr(c, "preference_tiers", None) or {},
+        "salary_min": c.salary_min,
+        "salary_max": c.salary_max,
+        "remote_preference": c.remote_preference,
+        "employment_percentage": c.employment_percentage,
+    }
+
+
+@router.put("/api/candidates/{candidate_id}/preferences")
+def update_candidate_preferences(
+    candidate_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
+):
+    c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    if not c:
+        raise HTTPException(status_code=404, detail="Candidate not found")
+
+    tiers = payload.get("preference_tiers")
+    if tiers is not None:
+        c.preference_tiers = tiers
+    if payload.get("salary_min") is not None:
+        c.salary_min = payload["salary_min"]
+    if payload.get("salary_max") is not None:
+        c.salary_max = payload["salary_max"]
+    if payload.get("remote_preference") is not None:
+        c.remote_preference = payload["remote_preference"]
+    if payload.get("employment_percentage") is not None:
+        c.employment_percentage = payload["employment_percentage"]
+    db.commit()
+    db.refresh(c)
+    return {
+        "candidate_id": c.id,
+        "preference_tiers": getattr(c, "preference_tiers", None) or {},
+        "salary_min": c.salary_min,
+        "salary_max": c.salary_max,
+        "remote_preference": c.remote_preference,
+        "employment_percentage": c.employment_percentage,
+    }
+
+
 @router.get("/api/jobs")
 def list_jobs(db: Session = Depends(get_db)):
     jobs = db.query(models.Job).all()
@@ -135,16 +182,9 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/api/matching/candidate/{candidate_id}/job/{job_id}")
-@router.post("/api/matching/candidate/{candidate_id}/job/{job_id}")
-def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(get_db)):
-    c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
-    j = db.query(models.Job).filter(models.Job.id == job_id).first()
-    if not c or not j:
-        raise HTTPException(status_code=404, detail="Candidate or job not found")
-
-    # build dicts for engine
-    candidate = {
+def _candidate_dict(c: models.Candidate) -> Dict[str, Any]:
+    """Build the engine-facing candidate dict from the ORM model."""
+    return {
         "id": c.id,
         "name": c.name,
         "location": c.location,
@@ -162,7 +202,20 @@ def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(ge
         "desired_roles": getattr(c, 'desired_roles', []),
         "personality": getattr(c, 'personality', None),
         "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
+        "preference_tiers": getattr(c, 'preference_tiers', None),
     }
+
+
+@router.get("/api/matching/candidate/{candidate_id}/job/{job_id}")
+@router.post("/api/matching/candidate/{candidate_id}/job/{job_id}")
+def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(get_db)):
+    c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+    j = db.query(models.Job).filter(models.Job.id == job_id).first()
+    if not c or not j:
+        raise HTTPException(status_code=404, detail="Candidate or job not found")
+
+    # build dicts for engine
+    candidate = _candidate_dict(c)
 
     job = {
         "id": j.id,
@@ -200,25 +253,7 @@ def match_candidate_all(candidate_id: int, db: Session = Depends(get_db)):
     if not c:
         raise HTTPException(status_code=404, detail="Candidate not found")
     jobs = db.query(models.Job).all()
-    candidate = {
-        "id": c.id,
-        "name": c.name,
-        "location": c.location,
-        "years_experience": sum([((e.end_date.year if e.end_date else 2026) - (e.start_date.year if e.start_date else 0)) for e in c.experiences]) if c.experiences else 0,
-        "skills": [{"skill": s.skill, "level": s.level} for s in c.skills],
-        "education": [{"degree": e.degree, "field": e.field} for e in c.education],
-        "languages": [],
-        "salary_expectation_min": getattr(c, 'salary_min', 0),
-        "salary_expectation_max": getattr(c, 'salary_max', 9999999),
-        "employment_percentage_min": getattr(c, 'employment_percentage_min', 50),
-        "employment_percentage_max": getattr(c, 'employment_percentage_max', 100),
-        "remote_preference": getattr(c, 'remote_preference', 'office'),
-        "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
-        "career_goal": getattr(c, 'career_goal', ''),
-        "desired_roles": getattr(c, 'desired_roles', []),
-        "personality": getattr(c, 'personality', None),
-        "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
-    }
+    candidate = _candidate_dict(c)
 
     results = []
     for j in jobs:
@@ -279,25 +314,7 @@ def match_job_all(job_id: int, db: Session = Depends(get_db)):
     }
     results = []
     for c in candidates:
-        candidate = {
-            "id": c.id,
-            "name": c.name,
-            "location": c.location,
-            "years_experience": sum([((e.end_date.year if e.end_date else 2026) - (e.start_date.year if e.start_date else 0)) for e in c.experiences]) if c.experiences else 0,
-            "skills": [{"skill": s.skill, "level": s.level} for s in c.skills],
-            "education": [{"degree": e.degree, "field": e.field} for e in c.education],
-            "languages": [],
-            "salary_expectation_min": getattr(c, 'salary_min', 0),
-            "salary_expectation_max": getattr(c, 'salary_max', 9999999),
-            "employment_percentage_min": getattr(c, 'employment_percentage_min', 50),
-            "employment_percentage_max": getattr(c, 'employment_percentage_max', 100),
-            "remote_preference": getattr(c, 'remote_preference', 'office'),
-            "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
-            "career_goal": getattr(c, 'career_goal', ''),
-            "desired_roles": getattr(c, 'desired_roles', []),
-            "personality": getattr(c, 'personality', None),
-            "values": [v["value"] if isinstance(v, dict) else v for v in (getattr(c, 'values', None) or [])],
-        }
+        candidate = _candidate_dict(c)
         r = score_candidate_job(candidate, job)
         results.append(r)
         log = MatchingLog(candidate_id=c.id, job_id=j.id, execution_time_ms=r.get('execution_time_ms'), algorithm_version=r.get('algorithm_version'))

@@ -13,6 +13,7 @@ CREATE TABLE candidates (
   career_goal TEXT,
   personality JSONB,
   values JSONB,
+  preference_tiers JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 

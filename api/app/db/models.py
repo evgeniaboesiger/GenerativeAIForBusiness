@@ -30,6 +30,7 @@ class Candidate(Base):
     career_goal = Column(Text)
     personality = Column(JSONType)
     values = Column(JSONType)
+    preference_tiers = Column(JSONType)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     experiences = relationship('Experience', back_populates='candidate', cascade='all, delete')

@@ -15,7 +15,15 @@ from typing import Dict, Any, List, Tuple
 import time
 from math import floor
 
-ALGORITHM_VERSION = "2.0"
+from app.matching.tiers import (
+    commute_minutes,
+    evaluate_preference_tiers,
+    has_tiers,
+    job_employment_range,
+    job_has_weekend_work,
+)
+
+ALGORITHM_VERSION = "2.1"
 
 # --------------------------------------------------------------------------- #
 # Scoring model (see research: hard constraints -> fit buckets -> overall)
@@ -157,38 +165,6 @@ def compute_language_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> Tu
     return round(avg, 2), missing_mandatory
 
 
-LOCATION_CLUSTER = {
-    "zurich": ["Zurich", "Winterthur", "Bülach", "Uster", "Dietikon", "Schlieren", "Dielsdorf", "Baden"],
-    "bern": ["Bern", "Biel", "Aarau"],
-    "basel": ["Basel"],
-    "lausanne": ["Lausanne", "Geneva"],
-    "lucerne": ["Lucerne"],
-    "stgallen": ["St. Gallen"],
-    "zug": ["Zug"],
-}
-
-
-def commute_minutes(candidate_loc: str, job_loc: str) -> int:
-    if not candidate_loc or not job_loc:
-        return 120
-    if candidate_loc == job_loc:
-        return 20
-    # find clusters
-    cand_cluster = None
-    job_cluster = None
-    for k, v in LOCATION_CLUSTER.items():
-        if candidate_loc in v:
-            cand_cluster = k
-        if job_loc in v:
-            job_cluster = k
-    if cand_cluster and job_cluster:
-        if cand_cluster == job_cluster:
-            return 35
-        # adjacent clusters approximate
-        return 65
-    return 120
-
-
 def compute_location_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
     commute = commute_minutes(candidate.get("location"), job.get("location"))
     max_commute = candidate.get("maximum_commute_minutes", 60)
@@ -245,6 +221,48 @@ def compute_salary_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> floa
         return round(frac * 100, 2)
     # candidate expects much more
     return 10.0
+
+
+def compute_remote_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
+    """Score remote-work fit (used by the practical-fit bucket).
+
+    Remote work has no dedicated component in the original model; giving it a
+    real score keeps the practical-fit bucket from being diluted (the weight
+    is 20%). Missing info stays neutral rather than penalising the candidate.
+    """
+    remote_pref = str(candidate.get("remote_preference") or "").lower()
+    job_remote = job.get("remote_percentage", 0) or 0
+
+    # Candidate wants remote/hybrid and the job actually offers it.
+    if remote_pref in ("remote", "fully remote", "mostly remote"):
+        if job_remote >= 70:
+            return 100.0
+        if job_remote >= 30:
+            return 70.0
+        return 30.0
+    if remote_pref in ("hybrid",):
+        if job_remote >= 30:
+            return 100.0
+        if job_remote >= 1:
+            return 70.0
+        return 40.0
+    if remote_pref in ("office", "mostly office", "fully office"):
+        if job_remote < 30:
+            return 100.0
+        return 50.0
+    # no explicit preference
+    return 70.0
+
+
+def compute_availability_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
+    """Availability / start-date fit. Neutral when no data is available."""
+    availability = candidate.get("availability")
+    start_date = job.get("details", {}).get("start_date") if isinstance(job.get("details"), dict) else job.get("start_date")
+    if not availability:
+        return 100.0  # unknown -> neutral, never penalise
+    if not start_date or str(start_date).lower() in ("immediately", "now", "asap"):
+        return 100.0
+    return 70.0
 
 
 def compute_career_goal_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
@@ -368,27 +386,6 @@ def check_mandatory_requirements(candidate: Dict[str, Any], job: Dict[str, Any])
 # --------------------------------------------------------------------------- #
 # HARD CONSTRAINTS (deal-breakers) - beyond the existing mandatory gate
 # --------------------------------------------------------------------------- #
-def _job_employment_range(job: Dict[str, Any]) -> Tuple[int, int]:
-    """Resolve the job's employment percentage as a (min, max) range."""
-    jmin = job.get("employment_percentage_min")
-    jmax = job.get("employment_percentage_max")
-    single = job.get("employment_percentage")
-    if jmin is None:
-        jmin = single if single is not None else 100
-    if jmax is None:
-        jmax = single if single is not None else 100
-    return jmin, jmax
-
-
-def _job_has_weekend_work(job: Dict[str, Any]) -> bool:
-    """Detect weekend/on-call requirements from job description text."""
-    haystack = " ".join([
-        str(job.get("description") or ""),
-        str(job.get("requirements") or ""),
-    ]).lower()
-    return any(k in haystack for k in ["weekend", "saturday", "sunday", "24/7", "on-call", "shift work"])
-
-
 def check_hard_constraints(candidate: Dict[str, Any], job: Dict[str, Any],
                            mandatory_met: bool, mandatory_reasons: List[str]) -> Tuple[bool, List[str]]:
     """Return (passed, violations) for deal-breaker constraints.
@@ -411,7 +408,7 @@ def check_hard_constraints(candidate: Dict[str, Any], job: Dict[str, Any],
     # 2. Workload %: candidate's required percentage must overlap the job's.
     cmax = candidate.get("employment_percentage_max")
     cmin_emp = candidate.get("employment_percentage_min")
-    jmin_emp, jmax_emp = _job_employment_range(job)
+    jmin_emp, jmax_emp = job_employment_range(job)
     if cmax is not None and cmin_emp is not None:
         if cmax < jmin_emp or cmin_emp > jmax_emp:
             violations.append(
@@ -429,7 +426,7 @@ def check_hard_constraints(candidate: Dict[str, Any], job: Dict[str, Any],
         )
 
     # 4. Weekend / unsociable hours.
-    if _job_has_weekend_work(job):
+    if job_has_weekend_work(job):
         violations.append("Scheduling deal-breaker: this role requires weekend or on-call work.")
 
     return (len(violations) == 0), violations
@@ -470,6 +467,8 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     location_score = compute_location_score(candidate, job)
     employment_score = compute_employment_score(candidate, job)
     salary_score = compute_salary_score(candidate, job)
+    remote_score = compute_remote_score(candidate, job)
+    availability_score = compute_availability_score(candidate, job)
     career_goal_score = compute_career_goal_score(candidate, job)
     values_score, matched_values = compute_values_score(candidate, job)
     personality_score, matched_dims = compute_personality_score(candidate, job)
@@ -484,6 +483,8 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         "location": location_score,
         "employment": employment_score,
         "salary": salary_score,
+        "remote": remote_score,
+        "availability": availability_score,
         "career_goal": career_goal_score,
         "values": values_score,
         "personality": personality_score,
@@ -493,6 +494,18 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     dealbreakers_met, dealbreaker_reasons = check_hard_constraints(
         candidate, job, mandatory_met, missing_reasons
     )
+
+    # P2: Ideal / Acceptable / Deal-breaker preference tiers. If the candidate
+    # has set tiers, they override the scalar practical components (employment,
+    # salary, location/commute, remote) and any tier deal-breaker is fused into
+    # the hard-constraint gate.
+    preference_tiers_result = None
+    if has_tiers(candidate):
+        preference_tiers_result = evaluate_preference_tiers(candidate, job)
+        components.update(preference_tiers_result.get("score_overrides") or {})
+        tier_violations = preference_tiers_result.get("hard_constraint_violations") or []
+        dealbreaker_reasons = list(dict.fromkeys(dealbreaker_reasons + tier_violations))
+        dealbreakers_met = dealbreakers_met and preference_tiers_result.get("hard_constraints_met", True)
 
     # Fit buckets: visible, interpretable components.
     fit_buckets = compute_fit_buckets(components)
@@ -559,6 +572,7 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
         "hard_constraints_met": dealbreakers_met,
         "hard_constraint_violations": dealbreaker_reasons,
         "mandatory_requirements_met": mandatory_met,
+        "preference_tiers": preference_tiers_result,
         "fit_buckets": fit_buckets,
         "professional_fit": professional_fit,
         "practical_fit": practical_fit,

@@ -365,3 +365,89 @@ def test_values_still_not_merged_into_overall_under_fit_model():
     # values_fit is reported for transparency but informational only
     assert "values" in res["informational_only"]
     assert res["values_fit"] < 100
+
+
+# --------------------------------------------------------------------------- #
+# P2: Ideal / Acceptable / Deal-breaker preference tiers
+# --------------------------------------------------------------------------- #
+def make_tiered_candidate():
+    c = make_candidate(["Python"], years=5, languages=[{"language": "German", "level": "C1"}])
+    c["preference_tiers"] = {
+        "salary": {"ideal": [90000, 120000], "acceptable": [80000, 130000], "deal_breaker": [75000, 150000]},
+        "commute": {"ideal_max_minutes": 30, "acceptable_max_minutes": 45, "deal_breaker_max_minutes": 60},
+        "remote": {"ideal": ["remote"], "acceptable": ["hybrid"], "deal_breaker": ["office"]},
+        "weekend": {"ideal": False, "acceptable": False, "deal_breaker": True},
+    }
+    return c
+
+
+def test_ideal_tier_scores_full_and_overrides_scalar():
+    candidate = make_tiered_candidate()
+    job = make_job(["Python"])
+    job.update({"salary_min": 90000, "salary_max": 120000, "remote_percentage": 100,
+                "description": "Fully remote. No weekend work."})
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+    tr = res["preference_tiers"]
+    assert tr["hard_constraints_met"] is True
+    comps = res["component_scores"]
+    # tier score overrides the scalar employment/salary/location/remote scores
+    assert comps["salary"] == 100.0
+    assert comps["remote"] == 100.0
+    assert comps["location"] >= 90
+    for name in ("salary", "commute", "remote", "weekend"):
+        assert tr["dimensions"][name]["deal_breaker"] is False
+
+
+def test_acceptable_tier_scores_partial():
+    candidate = make_tiered_candidate()
+    job = make_job(["Python"])
+    # salary sits only in the acceptable band (80k-90k top edge)
+    job.update({"salary_min": 80000, "salary_max": 85000, "remote_percentage": 50,
+                "description": "Hybrid work. No weekend cover."})
+    res = score_candidate_job(candidate, job)
+    tr = res["preference_tiers"]["dimensions"]
+    assert tr["salary"]["score"] == 70.0
+    assert tr["salary"]["deal_breaker"] is False
+    assert tr["remote"]["score"] == 70.0
+    assert res["hard_constraints_met"] is True
+
+
+def test_deal_breaker_tier_disqualifies():
+    candidate = make_tiered_candidate()
+    job = make_job(["Python"])
+    job.update({"salary_min": 60000, "salary_max": 70000, "remote_percentage": 0,
+                "description": "Office based. Weekend on-call shifts are required."})
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is False
+    assert res["category"] == "Not recommended"
+    tr = res["preference_tiers"]
+    assert tr["hard_constraints_met"] is False
+    assert any("deal-breaker" in v.lower() for v in tr["hard_constraint_violations"])
+    # overrides still applied - salary & remote scored 0 on this job
+    assert res["component_scores"]["salary"] == 0.0
+    assert res["component_scores"]["remote"] == 0.0
+
+
+def test_no_tiers_falls_back_to_scalar_preferences():
+    candidate = make_candidate(["Python"], years=5, languages=[{"language": "German", "level": "C1"}])
+    assert "preference_tiers" not in candidate
+    job = make_job(["Python"])
+    job.update({"description": "No weekend work."})
+    res = score_candidate_job(candidate, job)
+    assert res["preference_tiers"] is None
+    # existing scalar commute limit still enforced
+    assert res["component_scores"]["salary"] > 0
+    # remote now contributes to practical fit (dilution bug fixed)
+    comps = res["component_scores"]
+    assert "remote" in comps and "availability" in comps
+
+
+def test_negated_weekend_phrasing_is_not_a_dealbreaker():
+    from app.matching.tiers import job_has_weekend_work
+    job = make_job(["Python"])
+    job["description"] = "No weekend work. On-call rare and optional."
+    job["remote_percentage"] = 100
+    assert job_has_weekend_work(job) is False
+    res = score_candidate_job(make_tiered_candidate(), job)
+    assert res["hard_constraints_met"] is True
