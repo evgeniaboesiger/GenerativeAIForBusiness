@@ -89,6 +89,16 @@ After logging in, the app has **7 pages** in the left sidebar:
 
 > **AI mode toggle:** In the left sidebar you can turn on **🤖 AI mode**. It's **off by default** so the demo is instant and reliable. Turn it on (requires Ollama) to get AI-written explanations and cover letters.
 
+### 🌐 Interface languages
+
+The app currently ships with **English** (default) and **German**. You can switch languages at any time — even before logging in:
+
+1. In the left sidebar, open the **Language / Sprache** dropdown
+2. Pick your language (English or Deutsch)
+3. The whole interface updates immediately — navigation, buttons, and messages
+
+A new language can be added in `i18n.py` (register it in `SUPPORTED_LANGUAGES` and add the translations next to each `tr(...)` call).
+
 ---
 
 ## 🎯 Career Goals & Work Preferences
@@ -206,6 +216,7 @@ Run from the `matcha` folder. Tests cover the preference model & matching rules,
 ```
 matcha/
 ├── app.py                    # Main Streamlit application
+├── i18n.py                   # Interface language support (English + German)
 ├── preferences_ui.py         # Career Goals & Preferences onboarding wizard
 ├── agents/
 │   ├── profile_agent.py      # Agent 1: CV → Structured Profile

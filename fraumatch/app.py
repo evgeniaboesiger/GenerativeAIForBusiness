@@ -24,6 +24,9 @@ from db import (
 )
 from telemetry import summary as telemetry_summary
 
+# Interface language support (English default, German available)
+from i18n import SUPPORTED_LANGUAGES, tr
+
 # Career Goals & Work Preferences onboarding wizard
 from preferences_ui import show_preferences_page, get_active_preferences
 
@@ -50,7 +53,8 @@ def read_uploaded_file(uploaded_file) -> str:
     try:
         if name.endswith(".pdf"):
             if PdfReader is None:
-                return "PDF support not installed. Add 'pypdf' to requirements.txt."
+                return tr("PDF support not installed. Add 'pypdf' to requirements.txt.",
+                          "PDF-Unterstützung ist nicht installiert. Fügen Sie 'pypdf' zu requirements.txt hinzu.")
             reader = PdfReader(io.BytesIO(data))
             text_parts = []
             for page in reader.pages:
@@ -60,11 +64,13 @@ def read_uploaded_file(uploaded_file) -> str:
                     text_parts.append("")
             text = "\n".join(text_parts).strip()
             if not text:
-                return "Could not extract text from this PDF. It may be a scanned document (image-based)."
+                return tr("Could not extract text from this PDF. It may be a scanned document (image-based).",
+                          "Der Text konnte nicht aus dem PDF extrahiert werden. Möglicherweise handelt es sich um einen gescannten (bildbasierten) Beleg.")
             return text
         elif name.endswith(".docx"):
             if Document is None:
-                return "Word (.docx) support not installed. Add 'python-docx' to requirements.txt."
+                return tr("Word (.docx) support not installed. Add 'python-docx' to requirements.txt.",
+                          "Word (.docx)-Unterstützung ist nicht installiert. Fügen Sie 'python-docx' zu requirements.txt hinzu.")
             document = Document(io.BytesIO(data))
             text_parts = []
             for para in document.paragraphs:
@@ -77,14 +83,16 @@ def read_uploaded_file(uploaded_file) -> str:
                     if cells:
                         text_parts.append(" | ".join(cells))
             text = "\n".join(text_parts).strip()
-            return text if text else "No text found in this Word document."
+            return text if text else tr("No text found in this Word document.",
+                                        "In diesem Word-Dokument wurde kein Text gefunden.")
         elif name.endswith(".txt"):
-            return data.decode("utf-8", errors="replace").strip() or "Empty text file."
+            return data.decode("utf-8", errors="replace").strip() or tr("Empty text file.", "Leere Textdatei.")
         else:
-            return f"Unsupported file type: {uploaded_file.name}. Please upload a .pdf, .docx, or .txt file."
+            return tr("Unsupported file type: {}. Please upload a .pdf, .docx, or .txt file.",
+                      "Nicht unterstützter Dateityp: {}. Bitte laden Sie eine .pdf-, .docx- oder .txt-Datei hoch.").format(uploaded_file.name)
     except Exception as e:
         traceback.print_exc()
-        return f"Error reading file {uploaded_file.name}: {str(e)}"
+        return tr("Error reading file {}: {}", "Fehler beim Lesen der Datei {}: {}").format(uploaded_file.name, str(e))
 
 # Page configuration
 st.set_page_config(
@@ -126,6 +134,25 @@ def check_ollama_connection():
         return False
 
 
+# --- Page titles (used for both navigation and routing) ------------------- #
+# Keys stay language-independent; labels are translated per active language. #
+PAGE_KEYS = ["dashboard", "profile", "career_goals", "matching", "assessment", "application", "account"]
+
+
+def page_label(key: str) -> str:
+    """Return the (translated) sidebar label for a page key."""
+    labels = {
+        "dashboard": tr("🏠 Dashboard", "🏠 Übersicht"),
+        "profile": tr("👤 Candidate Profile", "👤 Kandidatenprofil"),
+        "career_goals": tr("🎯 Career Goals", "🎯 Karriereziele"),
+        "matching": tr("🎯 Job Matching", "🎯 Job-Matching"),
+        "assessment": tr("📈 Areas to Improve", "📈 Verbesserungsbereiche"),
+        "application": tr("📝 Application Agent", "📝 Bewerbungsassistent"),
+        "account": tr("🔐 My Account", "🔐 Mein Konto"),
+    }
+    return labels[key]
+
+
 def main():
     """Main application entry point."""
     init_session()
@@ -138,7 +165,14 @@ def main():
 
     # Sidebar - navigation
     st.sidebar.title("🤝 MATCHA")
-    st.sidebar.markdown("*Smart Job Matching for Women in Switzerland*")
+    st.sidebar.markdown(tr("*Smart Job Matching for Women in Switzerland*",
+                           "*Smartes Job-Matching für Frauen in der Schweiz*"))
+    lang = st.sidebar.selectbox(
+        tr("Language", "Sprache"),
+        list(SUPPORTED_LANGUAGES),
+        format_func=lambda code: SUPPORTED_LANGUAGES[code],
+        key="lang",
+    )
     st.sidebar.markdown("---")
 
     # Authentication flow: if not logged in, show login/register first.
@@ -152,14 +186,13 @@ def main():
     st.sidebar.caption(user["email"])
 
     page = st.sidebar.radio(
-        "Navigate",
-        ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Career Goals",
-         "🎯 Job Matching", "📈 Areas to Improve", "📝 Application Agent", "🔐 My Account"],
+        tr("Navigate", "Navigation"),
+        [page_label(key) for key in PAGE_KEYS],
         key="nav_page"
     )
     
     # Logout button
-    if st.sidebar.button("🚪 Log out", use_container_width=True):
+    if st.sidebar.button(tr("🚪 Log out", "🚪 Abmelden"), use_container_width=True):
         st.session_state.user = None
         st.session_state.current_profile = None
         st.session_state.current_matches = []
@@ -173,18 +206,20 @@ def main():
     
     # AI mode toggle - default OFF for reliable fast demo, ON for AI explanations
     use_ai = st.sidebar.toggle(
-        "🤖 AI mode (Ollama)",
+        tr("🤖 AI mode (Ollama)", "🤖 KI-Modus (Ollama)"),
         value=False,
-        help="Enable AI-generated explanations and cover letters. Requires Ollama running. Fast demo mode is instant and reliable."
+        help=tr("Enable AI-generated explanations and cover letters. Requires Ollama running. Fast demo mode is instant and reliable.",
+                "Aktiviert KI-generierte Erklärungen und Bewerbungsschreiben. Erfordert ein laufendes Ollama. Der schnelle Demo-Modus ist sofort und zuverlässig.")
     )
-    
+
     if not ollama_ok:
-        st.sidebar.warning("⚠️ Ollama (local AI) not detected. Fast demo mode will be used.")
+        st.sidebar.warning(tr("⚠️ Ollama (local AI) not detected. Fast demo mode will be used.",
+                              "⚠️ Ollama (lokale KI) wurde nicht erkannt. Es wird der schnelle Demo-Modus verwendet."))
         use_ai = False
     elif use_ai:
-        st.sidebar.success("🤖 AI mode active")
+        st.sidebar.success(tr("🤖 AI mode active", "🤖 KI-Modus aktiv"))
     else:
-        st.sidebar.info("⚡ Fast demo mode (instant results)")
+        st.sidebar.info(tr("⚡ Fast demo mode (instant results)", "⚡ Schneller Demo-Modus (sofortige Ergebnisse)"))
     
     # Load data
     sample_cvs = load_sample_cvs()
@@ -199,70 +234,73 @@ def main():
         st.session_state.selected_job = None
     
     # Route to selected page
-    if page == "🏠 Dashboard":
+    if page == page_label("dashboard"):
         show_dashboard()
-    elif page == "👤 Candidate Profile":
+    elif page == page_label("profile"):
         show_profile_page(sample_cvs, use_ai)
-    elif page == "🎯 Career Goals":
+    elif page == page_label("career_goals"):
         show_preferences_page()
-    elif page == "🎯 Job Matching":
+    elif page == page_label("matching"):
         show_matching_page(sample_jobs, use_ai)
-    elif page == "📈 Areas to Improve":
+    elif page == page_label("assessment"):
         show_assessment_page(sample_jobs)
-    elif page == "📝 Application Agent":
+    elif page == page_label("application"):
         show_application_page(sample_jobs, use_ai)
-    elif page == "🔐 My Account":
+    elif page == page_label("account"):
         show_account_page()
 
 
 def show_auth_page():
     """Login / registration page shown when the user is not signed in."""
-    st.title("🤝 Welcome to MATCHA")
+    st.title(tr("🤝 Welcome to MATCHA", "🤝 Willkommen bei MATCHA"))
     st.markdown(
-        "The Swiss employment-matching platform helping women find suitable jobs faster."
+        tr("The Swiss employment-matching platform helping women find suitable jobs faster.",
+           "Die Schweizer Job-Matching-Plattform, die Frauen hilft, schneller passende Stellen zu finden.")
     )
     st.markdown("---")
 
     # Buttons for choosing login vs register mode
-    tab_login, tab_register = st.tabs(["🔐 Log in", "📝 Create account"])
+    tab_login, tab_register = st.tabs([tr("🔐 Log in", "🔐 Anmelden"), tr("📝 Create account", "📝 Konto erstellen")])
 
     with tab_login:
         with st.form("login_form"):
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("Password", type="password", key="login_password")
-            submitted = st.form_submit_button("Log in", type="primary", use_container_width=True)
+            email = st.text_input(tr("Email", "E-Mail"), key="login_email")
+            password = st.text_input(tr("Password", "Passwort"), type="password", key="login_password")
+            submitted = st.form_submit_button(tr("Log in", "Anmelden"), type="primary", use_container_width=True)
             if submitted:
                 user = login_user(email, password)
                 if user:
                     st.session_state.user = user
-                    st.success("Logged in successfully!")
+                    st.success(tr("Logged in successfully!", "Erfolgreich angemeldet!"))
                     st.rerun()
                 else:
-                    st.error("Invalid email or password. Please try again.")
+                    st.error(tr("Invalid email or password. Please try again.",
+                                "Ungültige E-Mail oder ungültiges Passwort. Bitte versuchen Sie es erneut."))
 
     with tab_register:
         with st.form("register_form"):
-            full_name = st.text_input("Full name", key="reg_name")
-            reg_email = st.text_input("Email", key="reg_email")
+            full_name = st.text_input(tr("Full name", "Vollständiger Name"), key="reg_name")
+            reg_email = st.text_input(tr("Email", "E-Mail"), key="reg_email")
             reg_password = st.text_input(
-                "Password (min. 6 characters)", type="password", key="reg_password"
+                tr("Password (min. 6 characters)", "Passwort (mind. 6 Zeichen)"), type="password", key="reg_password"
             )
-            role = st.selectbox("I am a...", ["Candidate (job seeker)", "Recruiter"])
+            role = st.selectbox(tr("I am a...", "Ich bin..."), [tr("Candidate (job seeker)", "Kandidatin (Jobsuchende)"), tr("Recruiter", "Recruiter:in")])
 
-            submitted_reg = st.form_submit_button("Create account", type="primary", use_container_width=True)
+            submitted_reg = st.form_submit_button(tr("Create account", "Konto erstellen"), type="primary", use_container_width=True)
             if submitted_reg:
-                role_value = "candidate" if role.startswith("Candidate") else "recruiter"
+                role_value = "candidate" if role.startswith(("Candidate", "Kandidatin")) else "recruiter"
                 try:
                     user = register_user(reg_email, reg_password, full_name, role=role_value)
                     st.session_state.user = user
-                    st.success(f"Welcome, {user['full_name']}! Please now log in with your new password.")
+                    st.success(tr("Welcome, {}! Please now log in with your new password.",
+                                  "Willkommen, {}! Bitte melden Sie sich nun mit Ihrem neuen Passwort an.").format(user['full_name']))
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
 
     st.markdown("---")
-    with st.expander("🔒 How is my data protected?"):
-        st.markdown(
+    with st.expander(tr("🔒 How is my data protected?", "🔒 Wie werden meine Daten geschützt?")):
+        st.markdown(tr(
             """
             **MATCHA protects personal data:**
 
@@ -273,72 +311,90 @@ def show_auth_page():
 
             *This is a university proof-of-concept. Always follow applicable data
             protection regulations (e.g., GDPR) in a production deployment.*
+            """,
             """
-        )
+            **MATCHA schützt persönliche Daten:**
+
+            - **Passwörter** werden als gesalzene Hashwerte (PBKDF2) gespeichert — niemals im Klartext.
+            - **CV-Inhalte** werden verschlüsselt, bevor sie in die Datenbank geschrieben werden.
+            - Datenbank und Verschlüsselungsschlüssel liegen außerhalb des Quell-Repositorys.
+            - Konten sind pro Person angelegt; jede Person kann nur ihre eigenen Daten sehen.
+
+            *Dies ist ein universitäres Proof-of-Concept. In einem Produktiveinsatz gelten die
+            jeweils anwendbaren Datenschutzregeln (z. B. DSGVO).*
+            """
+        ))
 
     # Quick demo access (optional convenience - not real auth)
     st.markdown("---")
-    st.caption("**Demo tip:** Create a test account to try registration, or use any email + password you make up for a quick login.")
+    st.caption(tr("**Demo tip:** Create a test account to try registration, or use any email + password you make up for a quick login.",
+                  "**Demo-Tipp:** Legen Sie ein Testkonto an, um die Registrierung auszuprobieren, oder verwenden Sie eine beliebige E-Mail und ein beliebiges Passwort für einen schnellen Login."))
 
 
 def show_account_page():
     """Show the user's saved data, allow loading a saved profile."""
     user = st.session_state.user
-    st.title("🔐 My Account")
+    st.title(tr("🔐 My Account", "🔐 Mein Konto"))
     st.markdown("---")
 
-    st.subheader("Account details")
+    st.subheader(tr("Account details", "Kontodetails"))
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input("Name", value=user["full_name"], disabled=True)
+        st.text_input(tr("Name", "Name"), value=user["full_name"], disabled=True)
     with col2:
-        st.text_input("Email", value=user["email"], disabled=True)
-    st.info(f"Role: {'Candidate' if user['role'] == 'candidate' else 'Recruiter'}")
+        st.text_input(tr("Email", "E-Mail"), value=user["email"], disabled=True)
+    st.info(tr("Role: {}", "Rolle: {}").format('Candidate' if user['role'] == 'candidate' else 'Recruiter'))
 
     st.markdown("---")
-    st.subheader("Saved profile & CV")
+    st.subheader(tr("Saved profile & CV", "Gespeichertes Profil & CV"))
 
     saved = load_profile(user["id"])
     if saved:
-        st.success(f"Saved profile found (last updated: {saved.get('updated_at', '')}).")
+        st.success(tr("Saved profile found (last updated: {}).",
+                      "Gespeichertes Profil gefunden (zuletzt aktualisiert: {}).").format(saved.get('updated_at', '')))
         if saved.get("profile"):
             profile = saved["profile"]
             name = profile.get("personal_info", {}).get("name", "N/A")
             skills = profile.get("skills", [])
-            st.markdown(f"**Profile for:** {name}")
-            st.markdown(f"**Skills ({len(skills)}):** {', '.join(skills[:6]) if skills else 'N/A'}")
+            st.markdown(tr("**Profile for:** {}", "**Profil für:** {}").format(name))
+            st.markdown(tr("**Skills ({}):** {}", "**Fähigkeiten ({}):** {}").format(len(skills), ', '.join(skills[:6]) if skills else 'N/A'))
         else:
-            st.info("No structured profile saved yet.")
+            st.info(tr("No structured profile saved yet.", "Noch kein strukturiertes Profil gespeichert."))
 
         # Load saved data into session so matching can continue
-        if st.button("🔄 Load my saved profile", use_container_width=True):
+        if st.button(tr("🔄 Load my saved profile", "🔄 Gespeichertes Profil laden"), use_container_width=True):
             st.session_state.current_profile = saved.get("profile") or {}
-            st.success("Profile loaded! Go to **Job Matching** to find matches.")
+            st.success(tr("Profile loaded! Go to **Job Matching** to find matches.",
+                          "Profil geladen! Gehen Sie zu **Job Matching**, um passende Stellen zu finden."))
     else:
-        st.info("No saved profile yet. Extract a profile on the **Candidate Profile** page, then click **Save to my account**.")
+        st.info(tr("No saved profile yet. Extract a profile on the **Candidate Profile** page, then click **Save to my account**.",
+                   "Noch kein gespeichertes Profil. Extrahieren Sie ein Profil auf der Seite **Candidate Profile** und klicken Sie dann auf **Save to my account**."))
 
     st.markdown("---")
-    st.subheader("🎯 Saved career preferences")
+    st.subheader(tr("🎯 Saved career preferences", "🎯 Gespeicherte Karriere-Präferenzen"))
     saved_prefs = load_preferences(user["id"])
     if saved_prefs:
-        st.success(f"Career goals & work preferences saved (last updated: {saved_prefs.get('_updated_at', '')}).")
+        st.success(tr("Career goals & work preferences saved (last updated: {}).",
+                      "Karriereziele & Arbeitspräferenzen gespeichert (zuletzt aktualisiert: {}).").format(saved_prefs.get('_updated_at', '')))
         summary = get_active_preferences()
         if summary:
             from preferences import preferences_summary
             for label, value in preferences_summary(summary):
                 st.markdown(f"- **{label}:** {value}")
-        st.info("Edit them anytime on the **Career Goals** page - they are used for matching recommendations.")
+        st.info(tr("Edit them anytime on the **Career Goals** page - they are used for matching recommendations.",
+                   "Sie können sie jederzeit auf der Seite **Career Goals** bearbeiten - sie werden für Match-Empfehlungen verwendet."))
     else:
-        st.info("No career preferences saved yet. Set them on the **Career Goals** page to get preferences-aware recommendations.")
+        st.info(tr("No career preferences saved yet. Set them on the **Career Goals** page to get preferences-aware recommendations.",
+                   "Noch keine Karriere-Präferenzen gespeichert. Legen Sie sie auf der Seite **Career Goals** fest, um passgenauere Empfehlungen zu erhalten."))
 
 
 def show_dashboard():
     """Main dashboard: shortcuts to every real page of the app."""
-    st.title("👩‍💼 MATCHA Dashboard")
+    st.title(tr("👩‍💼 MATCHA Dashboard", "👩‍💼 MATCHA Dashboard"))
     st.markdown("---")
 
     # What MATCHA actually does - every card maps to a real page in the app
-    st.subheader("🚀 What you can do in MATCHA")
+    st.subheader(tr("🚀 What you can do in MATCHA", "🚀 Was Sie in MATCHA tun können"))
 
     st.markdown(
         """
@@ -360,12 +416,24 @@ def show_dashboard():
     )
 
     app_pages = [
-        ("👤 Candidate Profile", "Upload a CV or pick one of the sample profiles, then watch the structured profile extraction."),
-        ("🎯 Career Goals", "Tell MATCHA your work preferences (location, remote, employment %, salary, goals) in the onboarding wizard."),
-        ("🎯 Job Matching", "Rank your best-fit demo vacancies with explainable scores, preference checks and per-job tips."),
-        ("📈 Areas to Improve", "Get prioritized, job-relevant recommendations - professional and administrative - before you apply."),
-        ("📝 Application Agent", "Generate a tailored cover letter and CV summary from verified facts, review and approve it."),
-        ("🔐 My Account", "Inspect the profile and preferences saved under your account and reload them anytime."),
+        (page_label("profile"),
+         tr("Upload a CV or pick one of the sample profiles, then watch the structured profile extraction.",
+            "Laden Sie einen Lebenslauf hoch oder wählen Sie ein Beispielprofil aus und beobachten Sie die strukturierte Profilextraktion.")),
+        (page_label("career_goals"),
+         tr("Tell MATCHA your work preferences (location, remote, employment %, salary, goals) in the onboarding wizard.",
+            "Teilen Sie MATCHA im Onboarding-Assistenten Ihre Arbeitspräferenzen mit (Standort, Remote, Beschäftigungsgrad, Gehalt, Ziele).")),
+        (page_label("matching"),
+         tr("Rank your best-fit demo vacancies with explainable scores, preference checks and per-job tips.",
+            "Ranken Sie Ihre am besten passenden Demo-Stellen mit nachvollziehbaren Scores, Präferenz-Checks und Tipps pro Stelle.")),
+        (page_label("assessment"),
+         tr("Get prioritized, job-relevant recommendations - professional and administrative - before you apply.",
+            "Erhalten Sie priorisierte, jobspezifische Empfehlungen - fachlich und administrativ - bevor Sie sich bewerben.")),
+        (page_label("application"),
+         tr("Generate a tailored cover letter and CV summary from verified facts, review and approve it.",
+            "Erstellen Sie ein passgenaues Bewerbungsschreiben und eine CV-Zusammenfassung aus verifizierten Fakten - prüfen und bestätigen Sie.")),
+        (page_label("account"),
+         tr("Inspect the profile and preferences saved under your account and reload them anytime.",
+            "Sehen Sie sich die unter Ihrem Konto gespeicherten Profile und Präferenzen an und laden Sie sie jederzeit neu.")),
     ]
 
     cards = st.columns(3)
@@ -374,79 +442,113 @@ def show_dashboard():
             with st.container(border=True):
                 st.markdown(f"#### {page_name}")
                 st.markdown(page_desc)
-                if st.button("Open", key=f"open_page_{i}"):
+                if st.button(tr("Open", "Öffnen"), key=f"open_page_{i}"):
                     st.session_state._open_page = page_name
                     st.rerun()
 
     st.markdown("---")
     
     # Project overview
-    st.subheader("🎯 What is MATCHA?")
-    st.markdown("""
+    st.subheader(tr("🎯 What is MATCHA?", "🎯 Was ist MATCHA?"))
+    st.markdown(tr("""
     MATCHA is a **Swiss employment-matching platform** designed to:
-    
+
     - **Help women job seekers** identify suitable job opportunities faster
     - **Help recruiters** identify relevant candidates with less manual screening
     - **Reduce screening effort** while improving transparency and consistency
-    
+
     MATCHA does **NOT** replace recruiters or make automated hiring decisions. 
     It assists human decision-making with AI-powered tools.
-    """)
-    
+    """,
+    """
+    MATCHA ist eine **Schweizer Job-Matching-Plattform** mit dem Ziel:
+
+    - **Arbeitssuchenden Frauen** schneller geeignete Stellenangebote zu finden
+    - **Recruiter:innen** relevante Kandidatinnen mit weniger manuellem Screening zu identifizieren
+    - **Screening-Aufwand zu reduzieren** bei mehr Transparenz und Konsistenz
+
+    MATCHA **ersetzt keine** Recruiter:innen und trifft keine automatisierten
+    Einstellungsentscheidungen. Es unterstützt menschliche Entscheidungen mit KI-gestützten Tools.
+    """))
+
     st.markdown("---")
-    
+
     # Three agents overview
-    st.subheader("🤖 Our Three AI Agents")
-    
+    st.subheader(tr("🤖 Our Three AI Agents", "🤖 Unsere drei KI-Agenten"))
+
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         st.markdown("### 📋 Profile Agent")
-        st.markdown("""
+        st.markdown(tr("""
         **Goal:** Convert unstructured CVs into structured profiles.
-        
+
         - Extracts skills, experience, education
         - Normalizes job titles
         - Identifies preferences & goals
         - NEVER invents information
-        """)
-    
+        """,
+        """
+        **Ziel:** Unstrukturierte Lebensläufe in strukturierte Profile umwandeln.
+
+        - Extrahiert Fähigkeiten, Erfahrung, Ausbildung
+        - Normalisiert Berufsbezeichnungen
+        - Erkennt Präferenzen & Ziele
+        - ERFINDET NIE Informationen
+        """))
+
     with col2:
         st.markdown("### 🎯 Matching Agent")
-        st.markdown("""
+        st.markdown(tr("""
         **Goal:** Identify relevant jobs faster.
-        
+
         - **Deterministic scoring** (not AI-based)
         - Transparent weightings
         - Mandatory requirement checks
         - AI only for explanations
-        """)
-    
+        """,
+        """
+        **Ziel:** Relevante Jobs schneller erkennen.
+
+        - **Deterministische Bewertung** (nicht KI-basiert)
+        - Transparente Gewichtung
+        - Prüfung von Pflichtanforderungen
+        - KI nur für Erklärungen
+        """))
+
     with col3:
         st.markdown("### 📝 Application Agent")
-        st.markdown("""
+        st.markdown(tr("""
         **Goal:** Reduce application prep time.
-        
+
         - Tailored cover letters
         - CV summaries
         - Uses ONLY verified info
         - Requires candidate approval
-        """)
-    
+        """,
+        """
+        **Ziel:** Die Vorbereitungszeit für Bewerbungen verkürzen.
+
+        - Maßgeschneiderte Bewerbungsschreiben
+        - CV-Zusammenfassungen
+        - Verwendet NUR verifizierte Informationen
+        - Erfordert die Zustimmung der Kandidatin
+        """))
+
     st.markdown("---")
-    
+
     # Matching weights visualization
-    st.subheader("⚖️ Matching Weights")
-    
+    st.subheader(tr("⚖️ Matching Weights", "⚖️ Gewichtung des Matchings"))
+
     weights = {
-        "Skills": 30,
-        "Experience": 20,
-        "Education": 10,
-        "Languages": 10,
-        "Location/Remote": 10,
-        "Employment Preference": 10,
-        "Salary": 5,
-        "Career Goals": 5
+        tr("Skills", "Fähigkeiten"): 30,
+        tr("Experience", "Erfahrung"): 20,
+        tr("Education", "Ausbildung"): 10,
+        tr("Languages", "Sprachen"): 10,
+        tr("Location/Remote", "Standort/Remote"): 10,
+        tr("Employment Preference", "Beschäftigungspräferenz"): 10,
+        tr("Salary", "Gehalt"): 5,
+        tr("Career Goals", "Karriereziele"): 5
     }
     
     # Create a simple bar chart
@@ -463,138 +565,165 @@ def show_dashboard():
     st.markdown("---")
 
     # Matching efficiency experiment (telemetry - real data only, never invented)
-    with st.expander("📊 Matching Efficiency Experiment (A/B test)"):
-        st.markdown(
+    with st.expander(tr("📊 Matching Efficiency Experiment (A/B test)",
+                        "📊 Matching-Effizienz-Experiment (A/B-Test)")):
+        st.markdown(tr(
             "Each time a **Job Matching** run completes, anonymized aggregate metrics are "
             "recorded. Compare two groups to see whether collecting explicit preferences "
             "(**Version B**) improves matching efficiency over CV-only matching (**Version A**). "
-            "*No personal data is logged; results come only from real runs.*"
-        )
+            "*No personal data is logged; results come only from real runs.*",
+            "Jedes Mal, wenn ein **Job-Matching**-Durchlauf abgeschlossen ist, werden anonymisierte, "
+            "aggregierte Kennzahlen erfasst. Vergleichen Sie zwei Gruppen: ob das Erfassen expliziter "
+            "Präferenzen (**Version B**) die Match-Effizienz gegenüber dem reinen CV-Matching "
+            "(**Version A**) verbessert. *Es werden keine persönlichen Daten protokolliert; die "
+            "Ergebnisse stammen nur aus echten Durchläufen.*"
+        ))
         stats = telemetry_summary()
         if stats["total_runs"] == 0:
-            st.info("No matching runs recorded yet. Run a few matches with and without career preferences to populate the chart.")
+            st.info(tr("No matching runs recorded yet. Run a few matches with and without career preferences to populate the chart.",
+                       "Noch keine Matching-Durchläufe erfasst. Führen Sie ein paar Matches mit und ohne Karriere-Präferenzen aus, um die Grafik zu füllen."))
         else:
             colA, colB = st.columns(2)
             for col, version in ((colA, "A"), (colB, "B")):
                 agg = stats["versions"][version]
-                label = {"A": "Version A · CV only", "B": "Version B · CV + preferences"}[version]
+                label = {"A": tr("Version A · CV only", "Version A · nur CV"), "B": tr("Version B · CV + preferences", "Version B · CV + Präferenzen")}[version]
                 with col:
                     st.markdown(f"#### {label}")
                     if agg is None:
-                        st.write("No runs recorded for this version yet.")
+                        st.write(tr("No runs recorded for this version yet.", "Für diese Version wurden noch keine Durchläufe erfasst."))
                     else:
-                        st.metric("Runs", agg["runs"])
-                        st.metric("Avg. match score", f"{agg.get('avg_match_score')}%" if agg.get("avg_match_score") is not None else "—")
-                        st.metric("Avg. time per run", f"{agg.get('avg_time_s', 0)}s")
-                        st.metric("Jobs reviewed / run", agg.get("avg_jobs_reviewed"))
-                        st.metric("Relevant recommendations", agg.get("total_relevant_recommendations"))
+                        st.metric(tr("Runs", "Durchläufe"), agg["runs"])
+                        st.metric(tr("Avg. match score", "Ø Match-Score"), f"{agg.get('avg_match_score')}%" if agg.get("avg_match_score") is not None else "—")
+                        st.metric(tr("Avg. time per run", "Ø Zeit pro Durchlauf"), f"{agg.get('avg_time_s', 0)}s")
+                        st.metric(tr("Jobs reviewed / run", "Geprüfte Jobs / D."), agg.get("avg_jobs_reviewed"))
+                        st.metric(tr("Relevant recommendations", "Relevante Empfehlungen"), agg.get("total_relevant_recommendations"))
                         fr = agg.get("avg_first_relevant_rank")
-                        st.metric("First relevant match at rank", f"{fr}" if fr is not None else "—")
+                        st.metric(tr("First relevant match at rank", "Erster relevanter Treffer auf Rang"), f"{fr}" if fr is not None else "—")
                         dist = stats["distribution"].get(version) or {}
                         if dist:
-                            st.write("**Score distribution:**")
+                            st.write(tr("**Score distribution:**", "**Score-Verteilung:**"))
                             for bucket, frac in dist.items():
                                 st.markdown(f"`{bucket}%` — {round(frac * 100)}%")
-        st.caption(
+        st.caption(tr(
             "Metrics: number of relevant recommendations (score ≥ 60), time to identify "
             "jobs, jobs reviewed before finding a relevant opportunity, match-score "
             "distribution. This demonstrates whether richer candidate preferences create "
-            "measurable business value."
-        )
+            "measurable business value.",
+            "Kennzahlen: Anzahl relevanter Empfehlungen (Score ≥ 60), Zeit bis zum Finden "
+            "von Jobs, geprüfte Jobs vor einem relevanten Treffer, Score-Verteilung. "
+            "Das zeigt, ob umfangreichere Präferenzen der Kandidatin messbaren geschäftlichen Nutzen schaffen."
+        ))
 
     # About section
-    st.subheader("🏛️ About This Project")
-    st.markdown("""
+    st.subheader(tr("🏛️ About This Project", "🏛️ Über dieses Projekt"))
+    st.markdown(tr("""
     **MATCHA** is a university proof-of-concept demonstrating:
-    
+
     1. **AI can be implemented responsibly** - with human oversight
     2. **AI creates measurable business value** - faster matching, reduced screening
     3. **Transparency by design** - every match is explainable and reviewable
-    
+
     *This is a demonstration project. No real hiring decisions are made by AI.*
-    """)
+    """,
+    """
+    **MATCHA** ist ein universitäres Proof-of-Concept, das zeigt:
+
+    1. **KI kann verantwortungsvoll eingesetzt werden** - mit menschlicher Kontrolle
+    2. **KI schafft messbaren Nutzen** - schnelleres Matching, weniger Screening
+    3. **Transparenz durch Design** - jeder Match ist erklärbar und nachvollziehbar
+
+    *Dies ist ein Demonstrationsprojekt. Es werden keine echten Einstellungsentscheidungen von KI getroffen.*
+    """))
 
 
 def show_profile_page(sample_cvs, use_ai):
     """Candidate Profile page - uses Profile Agent."""
     
-    st.title("📋 Candidate Profile Extraction")
+    st.title(tr("📋 Candidate Profile Extraction", "📋 Profilextraktion für Kandidatin"))
     st.markdown("---")
-    
-    st.subheader("Step 1: Choose How to Provide the CV")
-    
+
+    st.subheader(tr("Step 1: Choose How to Provide the CV", "Schritt 1: So stellen Sie Ihren Lebenslauf bereit"))
+
     # Input source selector
     input_mode = st.radio(
-        "Select an input method:",
-        ["📁 Upload a CV file", "📄 Use a sample CV", "✍️ Paste CV text"],
+        tr("Select an input method:", "Wählen Sie eine Eingabemethode:"),
+        [tr("📁 Upload a CV file", "📁 CV-Datei hochladen"), tr("📄 Use a sample CV", "📄 Beispiel-CV verwenden"), tr("✍️ Paste CV text", "✍️ CV-Text einfügen")],
         horizontal=True
     )
     
     cv_text = ""
     source_label = ""
-    
-    if input_mode == "📁 Upload a CV file":
+
+    input_upload = tr("📁 Upload a CV file", "📁 CV-Datei hochladen")
+    input_sample = tr("📄 Use a sample CV", "📄 Beispiel-CV verwenden")
+    input_paste = tr("✍️ Paste CV text", "✍️ CV-Text einfügen")
+
+    if input_mode == input_upload:
         uploaded_file = st.file_uploader(
-            "Upload your CV (PDF, Word, or TXT)",
+            tr("Upload your CV (PDF, Word, or TXT)", "Lebenslauf hochladen (PDF, Word oder TXT)"),
             type=["pdf", "docx", "txt"],
-            help="Uploading a file makes it possible to extract your CV for analysis."
+            help=tr("Uploading a file makes it possible to extract your CV for analysis.",
+                    "Durch das Hochladen einer Datei kann Ihr CV für die Analyse extrahiert werden.")
         )
         if uploaded_file is not None:
-            with st.spinner("Reading file..."):
+            with st.spinner(tr("Reading file...", "Datei wird gelesen...")):
                 cv_text = read_uploaded_file(uploaded_file)
                 source_label = f"📁 {uploaded_file.name}"
             if cv_text:
-                st.info(f"Loaded text from **{uploaded_file.name}** ({len(cv_text)} characters)")
+                st.info(tr("Loaded text from **{}** ({} characters)",
+                           "Text aus **{}** geladen ({} Zeichen)").format(uploaded_file.name, len(cv_text)))
             else:
-                st.warning("No text could be read from this file.")
-    
-    elif input_mode == "📄 Use a sample CV":
+                st.warning(tr("No text could be read from this file.",
+                              "Aus dieser Datei konnte kein Text gelesen werden."))
+
+    elif input_mode == input_sample:
         use_sample = st.selectbox(
-            "Choose a sample CV for the demo:",
-            ["Select a sample CV..."] + [cv["name"] for cv in sample_cvs]
+            tr("Choose a sample CV for the demo:", "Wählen Sie einen Beispiel-CV für die Demo:"),
+            [tr("Select a sample CV...", "Beispiel-CV auswählen...")] + [cv["name"] for cv in sample_cvs]
         )
-        if use_sample != "Select a sample CV...":
+        if use_sample != tr("Select a sample CV...", "Beispiel-CV auswählen..."):
             selected = next((cv for cv in sample_cvs if cv["name"] == use_sample), None)
             if selected:
                 cv_text = selected["cv_text"]
                 source_label = f"📄 {selected['name']}"
-                st.info(f"Selected: {selected['name']}")
-    
+                st.info(tr("Selected: {}", "Ausgewählt: {}").format(selected['name']))
+
     else:  # Paste CV text
         custom_cv = st.text_area(
-            "Paste your CV text here:",
+            tr("Paste your CV text here:", "CV-Text hier einfügen:"),
             height=200,
-            placeholder="Copy and paste your CV text here..."
+            placeholder=tr("Copy and paste your CV text here...", "Kopieren Sie Ihren CV-Text hierher und fügen Sie ihn ein...")
         )
         if custom_cv:
             cv_text = custom_cv
-            source_label = "✍️ Pasted CV"
-    
+            source_label = tr("✍️ Pasted CV", "✍️ Eingefügter CV")
+
     st.markdown("---")
-    
+
     col1, col2 = st.columns([1, 3])
     with col1:
-        extract_button = st.button("🔍 Extract Profile", type="primary", use_container_width=True)
-    
+        extract_button = st.button(tr("🔍 Extract Profile", "🔍 Profil extrahieren"), type="primary", use_container_width=True)
+
     if extract_button and cv_text:
-        with st.spinner("Profile Agent is analyzing your CV..."):
+        with st.spinner(tr("Profile Agent is analyzing your CV...", "Der Profil-Agent analysiert Ihren Lebenslauf...")):
             # Use the Profile Agent (fast deterministic extraction - always works)
             profile_agent = ProfileAgent()
             profile = profile_agent.extract_profile_main(cv_text)
-            
+
             # Store in session
             st.session_state.current_profile = profile
             st.session_state.current_profile_source = source_label
             st.session_state.last_cv_text = cv_text
             st.session_state.edit_profile_mode = False
             st.session_state.edit_profile = None
-            
-            st.success("✅ Profile extracted successfully!")
+
+            st.success(tr("✅ Profile extracted successfully!", "✅ Profil erfolgreich extrahiert!"))
             show_profile_results(profile)
-    
+
     elif extract_button and not cv_text:
-        st.warning("No CV provided. Please upload a file, select a sample, or paste CV text.")
-    
+        st.warning(tr("No CV provided. Please upload a file, select a sample, or paste CV text.",
+                      "Kein Lebenslauf angegeben. Bitte laden Sie eine Datei hoch, wählen Sie ein Beispiel oder fügen Sie CV-Text ein."))
+
     # Show existing profile if available
     elif st.session_state.current_profile:
         show_profile_results(st.session_state.current_profile)
@@ -604,13 +733,13 @@ def show_profile_results(profile):
     """Display the extracted profile, with an edit mode so candidates can
     correct or complete any information the CV extraction missed."""
 
-    st.subheader("Extracted Candidate Profile")
+    st.subheader(tr("Extracted Candidate Profile", "Extrahiertes Kandidatenprofil"))
 
     # Check if there's an error
     if "error" in profile:
-        st.error(profile.get("error", "Error extracting profile"))
+        st.error(profile.get("error", tr("Error extracting profile", "Fehler bei der Profilextraktion")))
         if "raw_response" in profile:
-            with st.expander("View raw response"):
+            with st.expander(tr("View raw response", "Rohantwort anzeigen")):
                 st.code(profile["raw_response"])
         return
 
@@ -620,145 +749,151 @@ def show_profile_results(profile):
     col_top, _ = st.columns([1, 3])
     with col_top:
         if not editing:
-            if st.button("✏️ Edit Profile", use_container_width=True):
+            if st.button(tr("✏️ Edit Profile", "✏️ Profil bearbeiten"), use_container_width=True):
                 st.session_state.edit_profile_mode = True
                 st.session_state.edit_profile = copy.deepcopy(profile)
                 st.rerun()
         else:
-            if st.button("◀ Back to View", use_container_width=True):
+            if st.button(tr("◀ Back to View", "◀ Zurück zur Ansicht"), use_container_width=True):
                 st.session_state.edit_profile_mode = False
                 st.session_state.edit_profile = None
                 st.rerun()
 
     if editing:
-        st.info("✏️ **Editing mode:** correct or complete any information that was "
-                "not extracted from your CV, then click **💾 Save Profile Changes** below.")
+        st.info(tr("✏️ **Editing mode:** correct or complete any information that was "
+                   "not extracted from your CV, then click **💾 Save Profile Changes** below.",
+                   "✏️ **Bearbeitungsmodus:** korrigieren oder ergänzen Sie alle Informationen, "
+                   "die nicht aus Ihrem CV extrahiert wurden, und klicken Sie unten auf **💾 Profiländerungen speichern**."))
         work = st.session_state.get("edit_profile") or copy.deepcopy(profile)
     else:
         work = profile
 
     # Personal info
     personal = work.get("personal_info", {})
-    st.markdown("### 👤 Personal Information")
+    st.markdown(tr("### 👤 Personal Information", "### 👤 Persönliche Angaben"))
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.text_input("Name", value=personal.get("name", ""), disabled=not editing, key="pi_name")
+        st.text_input(tr("Name", "Name"), value=personal.get("name", ""), disabled=not editing, key="pi_name")
     with col2:
-        st.text_input("Location", value=personal.get("location", ""), disabled=not editing, key="pi_location")
+        st.text_input(tr("Location", "Ort"), value=personal.get("location", ""), disabled=not editing, key="pi_location")
     with col3:
-        st.text_input("Email", value=personal.get("email", ""), disabled=not editing, key="pi_email")
+        st.text_input(tr("Email", "E-Mail"), value=personal.get("email", ""), disabled=not editing, key="pi_email")
     with col4:
-        st.text_input("Phone", value=personal.get("phone", ""), disabled=not editing, key="pi_phone")
+        st.text_input(tr("Phone", "Telefon"), value=personal.get("phone", ""), disabled=not editing, key="pi_phone")
 
     # Summary
     if work.get("summary") or editing:
-        st.markdown("**Professional Summary:**")
+        st.markdown(tr("**Professional Summary:**", "**Berufliche Zusammenfassung:**"))
         if editing:
-            st.text_area("Summary", value=work.get("summary", ""), key="summary_edit", label_visibility="collapsed")
+            st.text_area(tr("Summary", "Zusammenfassung"), value=work.get("summary", ""), key="summary_edit", label_visibility="collapsed")
         else:
             st.write(work["summary"])
 
     st.markdown("---")
 
     # Work experience
-    st.markdown("### 💼 Work Experience")
+    st.markdown(tr("### 💼 Work Experience", "### 💼 Berufserfahrung"))
     work_exp = work.get("work_experience", [])
     if editing:
-        st.caption("Edit each role below, or use the buttons to add / remove entries.")
+        st.caption(tr("Edit each role below, or use the buttons to add / remove entries.",
+                      "Bearbeiten Sie jede Rolle unten oder nutzen Sie die Schaltflächen zum Hinzufügen / Entfernen."))
     if work_exp:
         for i, exp in enumerate(work_exp):
             if editing:
                 col_t, col_c, col_d, col_del = st.columns([2, 2, 2, 1])
                 with col_t:
-                    st.text_input("Title", value=exp.get("title", ""), key=f"exp_title_{i}")
+                    st.text_input(tr("Title", "Titel"), value=exp.get("title", ""), key=f"exp_title_{i}")
                 with col_c:
-                    st.text_input("Company", value=exp.get("company", ""), key=f"exp_company_{i}")
+                    st.text_input(tr("Company", "Unternehmen"), value=exp.get("company", ""), key=f"exp_company_{i}")
                 with col_d:
-                    st.text_input("Duration", value=exp.get("duration", ""), key=f"exp_duration_{i}")
+                    st.text_input(tr("Duration", "Dauer"), value=exp.get("duration", ""), key=f"exp_duration_{i}")
                 with col_del:
-                    if st.button("🗑️", key=f"exp_del_{i}", help="Remove this entry"):
+                    if st.button("🗑️", key=f"exp_del_{i}", help=tr("Remove this entry", "Diesen Eintrag entfernen")):
                         work["work_experience"].pop(i)
                         st.rerun()
                 achievements = "\n".join(exp.get("key_achievements", []))
-                st.text_area("Key achievements (one per line)", value=achievements,
+                st.text_area(tr("Key achievements (one per line)", "Wichtigste Erfolge (eine Zeile pro Eintrag)"), value=achievements,
                              key=f"exp_achiev_{i}")
             else:
                 with st.container():
                     st.markdown(f"**{exp.get('title', 'Role')}** at *{exp.get('company', 'Company')}*")
-                    st.caption(f"Duration: {exp.get('duration', 'N/A')}")
+                    st.caption(tr("Duration: {}", "Dauer: {}").format(exp.get('duration', 'N/A')))
                     achievements = exp.get("key_achievements", [])
                     if achievements:
                         for achievement in achievements[:3]:
                             st.markdown(f"- {achievement}")
                     st.markdown("---")
     else:
-        st.info("No work experience found.")
+        st.info(tr("No work experience found.", "Keine Berufserfahrung gefunden."))
     if editing:
-        if st.button("➕ Add work experience", key="exp_add"):
+        if st.button(tr("➕ Add work experience", "➕ Berufserfahrung hinzufügen"), key="exp_add"):
             work["work_experience"].append({"title": "", "company": "", "duration": "", "key_achievements": []})
             st.rerun()
 
     st.markdown("---")
 
     # Education
-    st.markdown("### 🎓 Education")
+    st.markdown(tr("### 🎓 Education", "### 🎓 Ausbildung"))
     education = work.get("education", [])
     if editing:
-        st.caption("Edit each education entry below, or use the buttons to add / remove entries.")
+        st.caption(tr("Edit each education entry below, or use the buttons to add / remove entries.",
+                      "Bearbeiten Sie jeden Ausbildungseintrag unten oder nutzen Sie die Schaltflächen zum Hinzufügen / Entfernen."))
     if education:
         for i, edu in enumerate(education):
             if editing:
                 col_deg, col_inst, col_year, col_del = st.columns([2, 2, 1, 1])
                 with col_deg:
-                    st.text_input("Degree", value=edu.get("degree", ""), key=f"edu_degree_{i}")
+                    st.text_input(tr("Degree", "Abschluss"), value=edu.get("degree", ""), key=f"edu_degree_{i}")
                 with col_inst:
-                    st.text_input("Institution", value=edu.get("institution", ""), key=f"edu_inst_{i}")
+                    st.text_input(tr("Institution", "Institution"), value=edu.get("institution", ""), key=f"edu_inst_{i}")
                 with col_year:
-                    st.text_input("Year", value=edu.get("year", ""), key=f"edu_year_{i}")
+                    st.text_input(tr("Year", "Jahr"), value=edu.get("year", ""), key=f"edu_year_{i}")
                 with col_del:
-                    if st.button("🗑️", key=f"edu_del_{i}", help="Remove this entry"):
+                    if st.button("🗑️", key=f"edu_del_{i}", help=tr("Remove this entry", "Diesen Eintrag entfernen")):
                         work["education"].pop(i)
                         st.rerun()
             else:
                 st.markdown(f"**{edu.get('degree', 'Degree')}** - {edu.get('institution', 'Institution')} ({edu.get('year', '')})")
     else:
-        st.info("No education found.")
+        st.info(tr("No education found.", "Keine Ausbildung gefunden."))
     if editing:
-        if st.button("➕ Add education", key="edu_add"):
+        if st.button(tr("➕ Add education", "➕ Ausbildung hinzufügen"), key="edu_add"):
             work["education"].append({"degree": "", "institution": "", "year": ""})
             st.rerun()
 
     st.markdown("---")
 
     # Skills
-    st.markdown("### 🔧 Skills")
+    st.markdown(tr("### 🔧 Skills", "### 🔧 Fähigkeiten"))
     skills = work.get("skills", [])
     if editing:
         skills_text = ", ".join(skills)
-        st.text_input("Skills (comma-separated)", value=skills_text, key="skills_edit")
-        st.caption("Separate multiple skills with commas, e.g. Python, SQL, Project Management")
+        st.text_input(tr("Skills (comma-separated)", "Fähigkeiten (durch Kommas getrennt)"), value=skills_text, key="skills_edit")
+        st.caption(tr("Separate multiple skills with commas, e.g. Python, SQL, Project Management",
+                      "Trennen Sie mehrere Fähigkeiten durch Kommas, z. B. Python, SQL, Projektmanagement"))
     elif skills:
         # Display as tags
         skills_html = " ".join([f'<span style="background-color:#e0e0e0;padding:4px 8px;border-radius:4px;margin:2px;">{s}</span>' for s in skills])
         st.markdown(f"<div style='margin-bottom:10px;'>{skills_html}</div>", unsafe_allow_html=True)
     else:
-        st.info("No skills found.")
+        st.info(tr("No skills found.", "Keine Fähigkeiten gefunden."))
 
     # Languages
-    st.markdown("### 🌍 Languages")
+    st.markdown(tr("### 🌍 Languages", "### 🌍 Sprachen"))
     languages = work.get("languages", [])
     if editing:
-        st.caption("Edit your languages and levels below, or use the buttons to add / remove entries.")
+        st.caption(tr("Edit your languages and levels below, or use the buttons to add / remove entries.",
+                      "Bearbeiten Sie unten Ihre Sprachen und Niveaus oder nutzen Sie die Schaltflächen zum Hinzufügen / Entfernen."))
     if languages:
         for i, lang in enumerate(languages):
             if editing:
                 col_lang, col_lvl, col_del = st.columns([2, 2, 1])
                 with col_lang:
-                    st.text_input("Language", value=lang.get("language", "") if isinstance(lang, dict) else "", key=f"lang_name_{i}")
+                    st.text_input(tr("Language", "Sprache"), value=lang.get("language", "") if isinstance(lang, dict) else "", key=f"lang_name_{i}")
                 with col_lvl:
-                    st.text_input("Level", value=lang.get("level", "") if isinstance(lang, dict) else "", key=f"lang_level_{i}")
+                    st.text_input(tr("Level", "Niveau"), value=lang.get("level", "") if isinstance(lang, dict) else "", key=f"lang_level_{i}")
                 with col_del:
-                    if st.button("🗑️", key=f"lang_del_{i}", help="Remove this entry"):
+                    if st.button("🗑️", key=f"lang_del_{i}", help=tr("Remove this entry", "Diesen Eintrag entfernen")):
                         work["languages"].pop(i)
                         st.rerun()
             else:
@@ -767,20 +902,21 @@ def show_profile_results(profile):
                 else:
                     st.markdown(f"- {lang}")
     else:
-        st.info("No languages found.")
+        st.info(tr("No languages found.", "Keine Sprachen gefunden."))
     if editing:
-        if st.button("➕ Add language", key="lang_add"):
+        if st.button(tr("➕ Add language", "➕ Sprache hinzufügen"), key="lang_add"):
             work["languages"].append({"language": "", "level": ""})
             st.rerun()
 
     # Certifications
     certs = work.get("certifications", [])
     if certs or editing:
-        st.markdown("### 📜 Certifications")
+        st.markdown(tr("### 📜 Certifications", "### 📜 Zertifikate"))
         if editing:
             certs_text = ", ".join(certs)
-            st.text_input("Certifications (comma-separated)", value=certs_text, key="certs_edit")
-            st.caption("Separate multiple certifications with commas, e.g. PMP, AWS Certified, CPA")
+            st.text_input(tr("Certifications (comma-separated)", "Zertifikate (durch Kommas getrennt)"), value=certs_text, key="certs_edit")
+            st.caption(tr("Separate multiple certifications with commas, e.g. PMP, AWS Certified, CPA",
+                          "Trennen Sie mehrere Zertifikate durch Kommas, z. B. PMP, AWS Certified, CPA"))
         else:
             for cert in certs:
                 st.markdown(f"- {cert}")
@@ -788,7 +924,7 @@ def show_profile_results(profile):
     # Preferences
     prefs = work.get("preferences", {})
     if prefs or editing:
-        st.markdown("### ⚙️ Preferences")
+        st.markdown(tr("### ⚙️ Preferences", "### ⚙️ Präferenzen"))
         if editing:
             pref_keys = ["employment_type", "remote_preference", "location_constraint", "salary_expectation"]
             pref_cols = st.columns(2)
@@ -803,9 +939,9 @@ def show_profile_results(profile):
 
     # Career goals
     if editing or work.get("career_goals"):
-        st.markdown("### 🎯 Career Goals")
+        st.markdown(tr("### 🎯 Career Goals", "### 🎯 Karriereziele"))
         if editing:
-            st.text_area("Career goals", value=work.get("career_goals", ""),
+            st.text_area(tr("Career goals", "Karriereziele"), value=work.get("career_goals", ""),
                          key="career_goals_edit", label_visibility="collapsed")
         else:
             st.write(work["career_goals"])
@@ -814,7 +950,7 @@ def show_profile_results(profile):
 
     if editing:
         # Save edits back into the working profile
-        if st.button("💾 Save Profile Changes", type="primary", use_container_width=True):
+        if st.button(tr("💾 Save Profile Changes", "💾 Profiländerungen speichern"), type="primary", use_container_width=True):
             edit = st.session_state.get("edit_profile") or copy.deepcopy(profile)
 
             edit["personal_info"] = {
@@ -871,71 +1007,79 @@ def show_profile_results(profile):
             st.session_state.current_profile = edit
             st.session_state.edit_profile_mode = False
             st.session_state.edit_profile = None
-            st.success("✅ Profile updated successfully!")
+            st.success(tr("✅ Profile updated successfully!", "✅ Profil erfolgreich aktualisiert!"))
             st.rerun()
     else:
-        st.info("💡 **Verification:** Please review all extracted information. "
-                "You can correct any errors by clicking **✏️ Edit Profile** before proceeding to job matching.")
+        st.info(tr("💡 **Verification:** Please review all extracted information. "
+                   "You can correct any errors by clicking **✏️ Edit Profile** before proceeding to job matching.",
+                   "💡 **Prüfung:** Bitte überprüfen Sie alle extrahierten Informationen. "
+                   "Sie können Fehler korrigieren, indem Sie **✏️ Profil bearbeiten** klicken, bevor Sie mit dem Job-Matching fortfahren."))
 
         # Save profile to the user's account (stored encrypted in the database)
         if st.session_state.user:
             existing_saved = load_profile(st.session_state.user["id"])
             col_save, _ = st.columns([1, 2])
             with col_save:
-                if st.button("💾 Save to my account", type="primary", use_container_width=True):
+                if st.button(tr("💾 Save to my account", "💾 Auf meinem Konto speichern"), type="primary", use_container_width=True):
                     try:
                         save_profile(
                             st.session_state.user["id"],
                             getattr(st.session_state, "last_cv_text", ""),
                             profile
                         )
-                        st.success("✅ Profile and CV saved securely to your account!")
+                        st.success(tr("✅ Profile and CV saved securely to your account!", "✅ Profil und CV wurden sicher auf Ihrem Konto gespeichert!"))
                     except Exception as e:
-                        st.error(f"Could not save profile: {e}")
+                        st.error(tr("Could not save profile: {}", "Profil konnte nicht gespeichert werden: {}").format(e))
             if existing_saved and existing_saved.get("profile"):
-                st.caption("📁 You already have a saved profile. Saving again will update it.")
+                st.caption(tr("📁 You already have a saved profile. Saving again will update it.",
+                              "📁 Sie haben bereits ein gespeichertes Profil. Beim erneuten Speichern wird es aktualisiert."))
 
 
 def show_matching_page(sample_jobs, use_ai):
     """Job Matching page - uses Matching Agent."""
     
-    st.title("🎯 Job Matching")
+    st.title(tr("🎯 Job Matching", "🎯 Job-Matching"))
     st.markdown("---")
     
     if not st.session_state.current_profile:
-        st.warning("⚠️ No candidate profile yet. Please go to **Candidate Profile** page first and extract a profile.")
+        st.warning(tr("⚠️ No candidate profile yet. Please go to **Candidate Profile** page first and extract a profile.",
+                      "⚠️ Noch kein Kandidatenprofil. Bitte gehen Sie zuerst auf die Seite **Kandidatenprofil** und extrahieren Sie ein Profil."))
         return
     
     profile = st.session_state.current_profile
-    st.success(f"Matching for: **{profile.get('personal_info', {}).get('name', 'Candidate')}**")
+    st.success(tr("Matching for: **{}**", "Matching für: **{}**").format(profile.get('personal_info', {}).get('name', tr('Candidate', 'Kandidatin'))))
 
     # Merge the candidate's explicit preferences (if any) into the profile so
     # the matching engine can use them. Missing preferences stay neutral.
     active_prefs = get_active_preferences()
-    prefs_status = "not set"
+    prefs_status = tr("not set", "nicht gesetzt")
     if active_prefs:
         profile = {**profile, "preferences": active_prefs}
-        prefs_status = "active"
+        prefs_status = tr("active", "aktiv")
 
     if active_prefs:
-        st.info("🎯 Your saved **Career Goals & Work Preferences** are being used to tailor these recommendations.")
+        st.info(tr("🎯 Your saved **Career Goals & Work Preferences** are being used to tailor these recommendations.",
+                   "🎯 Ihre gespeicherten **Karriereziele & Arbeitspräferenzen** werden verwendet, um diese Empfehlungen anzupassen."))
     else:
-        st.info("ℹ️ You have **no career preferences set yet**. Recommendations use your CV only. "
-                "Add preferences on the **Career Goals** page for more tailored results.")
+        st.info(tr("ℹ️ You have **no career preferences set yet**. Recommendations use your CV only. "
+                   "Add preferences on the **Career Goals** page for more tailored results.",
+                   "ℹ️ Sie haben **noch keine Karriere-Präferenzen gesetzt**. Die Empfehlungen basieren nur auf Ihrem CV. "
+                   "Legen Sie Präferenzen auf der Seite **Karriereziele** fest, um passgenauere Ergebnisse zu erhalten."))
 
     col1, col2 = st.columns([1, 2])
     with col1:
-        top_n = st.slider("Number of matches to show", 3, 8, 5)
+        top_n = st.slider(tr("Number of matches to show", "Anzahl der anzuzeigenden Treffer"), 3, 8, 5)
 
-    match_button = st.button("🔍 Find Matching Jobs", type="primary")
+    match_button = st.button(tr("🔍 Find Matching Jobs", "🔍 Passende Jobs finden"), type="primary")
 
     if match_button:
-        with st.spinner("Matching Agent is analyzing job compatibility..."):
+        with st.spinner(tr("Matching Agent is analyzing job compatibility...", "Der Matching-Agent analysiert die Job-Kompatibilität...")):
             matching_agent = MatchingAgent()
 
             # Check if profile has error
             if "error" in profile:
-                st.error("Profile extraction had errors. Please re-extract profile.")
+                st.error(tr("Profile extraction had errors. Please re-extract profile.",
+                            "Die Profilextraktion enthielt Fehler. Bitte extrahieren Sie das Profil erneut."))
                 return
 
             import time
@@ -944,16 +1088,17 @@ def show_matching_page(sample_jobs, use_ai):
                                                   use_ai=use_ai, record_telemetry=True)
             st.session_state.current_matches = matches
 
-            st.success(f"Found {len(matches)} potential matches (took {time.time() - start:.2f}s, preferences: {prefs_status}).")
-    
+            st.success(tr("Found {} potential matches (took {:.2f}s, preferences: {}).",
+                          "{} potenzielle Treffer gefunden (dauerte {:.2f}s, Präferenzen: {}).").format(len(matches), time.time() - start, prefs_status))
+
     # Display matches
     if st.session_state.current_matches:
         matches = st.session_state.current_matches
         show_matches(matches, sample_jobs, profile)
-    
+
     # Show matching weights explanation
-    with st.expander("📊 How Matching Works"):
-        st.markdown("""
+    with st.expander(tr("📊 How Matching Works", "📊 So funktioniert das Matching")):
+        st.markdown(tr("""
         ### Deterministic Scoring Weights:
         
         | Criterion | Weight |
@@ -972,40 +1117,65 @@ def show_matching_page(sample_jobs, use_ai):
         position regardless of the numerical score.
         
         The **AI (LLM) is only used for explanations** - never for the actual scoring.
+        """,
+        """
+        ### Deterministische Gewichtung:
+
+        | Kriterium | Gewicht |
+        |-----------|---------|
+        | Fähigkeiten | 30 % |
+        | Erfahrung | 20 % |
+        | Ausbildung | 10 % |
+        | Sprachen | 10 % |
+        | Standort/Remote | 10 % |
+        | Beschäftigungspräferenz | 10 % |
+        | Gehalt | 5 % |
+        | Karriereziele | 5 % |
+
+        **Pflichtanforderungen werden separat geprüft.** Erfüllt eine Kandidatin eine
+        Pflichtanforderung (z. B. eine geforderte Sprache) nicht, wird sie für diese
+        Position unabhängig von der Punktzahl nicht empfohlen.
+
+        Die **KI (LLM) wird nur für Erklärungen verwendet** - nie für die eigentliche Bewertung.
         """)
+    )
 
 
 def show_assessment_page(sample_jobs):
     """Full 'Areas to Improve' report: professional + administrative improvements."""
 
-    st.title("📈 Areas to Improve")
+    st.title(tr("📈 Areas to Improve", "📈 Verbesserungsbereiche"))
     st.markdown("---")
 
     if not st.session_state.current_profile:
-        st.warning("⚠️ No candidate profile yet. Please go to **Candidate Profile** page first and extract a profile.")
+        st.warning(tr("⚠️ No candidate profile yet. Please go to **Candidate Profile** page first and extract a profile.",
+                      "⚠️ Noch kein Kandidatenprofil. Bitte gehen Sie zuerst auf die Seite **Kandidatenprofil** und extrahieren Sie ein Profil."))
         return
 
     profile = st.session_state.current_profile
     active_prefs = get_active_preferences()
 
-    st.markdown(
+    st.markdown(tr(
         "*This assessment compares your profile against your best-fit positions and points "
         "you to **job-relevant** areas to improve - professional skills and administrative "
-        "details. It does **not** assess your personality or personal worth.*"
-    )
+        "details. It does **not** assess your personality or personal worth.*",
+        "*Diese Einschätzung vergleicht Ihr Profil mit Ihren am besten passenden Positionen "
+        "und zeigt Ihnen **jobspezifische** Verbesserungsbereiche - fachliche Fähigkeiten und "
+        "administrative Details. Sie bewertet **nicht** Ihre Persönlichkeit oder Ihren persönlichen Wert.*"
+    ))
 
     if active_prefs:
         profile = {**profile, "preferences": active_prefs}
 
-    st.success(f"Assessment for: **{profile.get('personal_info', {}).get('name', 'Candidate')}**")
+    st.success(tr("Assessment for: **{}**", "Einschätzung für: **{}**").format(profile.get('personal_info', {}).get('name', tr('Candidate', 'Kandidatin'))))
 
-    if st.button("🔄 Refresh assessment", type="primary"):
+    if st.button(tr("🔄 Refresh assessment", "🔄 Einschätzung aktualisieren"), type="primary"):
         pass  # re-run below (Streamlit reruns on button click)
 
     engine = RecommendationEngine()
     result = engine.assess(profile, sample_jobs, active_prefs)
 
-    st.markdown("### 🎯 Based on your best-fit roles")
+    st.markdown(tr("### 🎯 Based on your best-fit roles", "### 🎯 Basierend auf Ihren Best-Match-Rollen"))
     top_jobs = result["top_jobs"]
     if top_jobs:
         cols = st.columns(min(len(top_jobs), 4))
@@ -1013,45 +1183,48 @@ def show_assessment_page(sample_jobs):
             with col:
                 st.metric(job["title"], f"{job['score']}%", help=job["company"])
     else:
-        st.info("No comparable positions found to assess against.")
+        st.info(tr("No comparable positions found to assess against.",
+                   "Keine vergleichbaren Positionen für die Einschätzung gefunden."))
 
     st.markdown("---")
 
     # Professional improvement areas
-    st.markdown("### 💼 Professional areas to improve")
+    st.markdown(tr("### 💼 Professional areas to improve", "### 💼 Fachliche Verbesserungsbereiche"))
     professional = result["professional"]
     if professional:
         for item in professional:
-            badge = {"high": "🔴 High", "medium": "🟠 Medium", "low": "🟡 Low"}[item["priority"]]
+            badge = {"high": tr("🔴 High", "🔴 Hoch"), "medium": tr("🟠 Medium", "🟠 Mittel"), "low": tr("🟡 Low", "🟡 Niedrig")}[item["priority"]]
             with st.container(border=True):
-                st.markdown(f"**{item['area']}** — `{badge}`")
+                st.markdown("**" + item["area"] + "** — `" + badge + "`")
                 st.caption(item["detail"])
-                st.markdown(f"→ **Suggestion:** {item['action']}")
+                st.markdown(tr("→ **Suggestion:** {}", "→ **Vorschlag:** {}").format(item["action"]))
                 if item.get("source_jobs"):
-                    st.caption(f"Relevant for: {', '.join(item['source_jobs'])}")
+                    st.caption(tr("Relevant for: {}", "Relevant für: {}").format(", ".join(item["source_jobs"])))
     else:
-        st.info("No professional gaps found - you already cover your best-fit roles well.")
+        st.info(tr("No professional gaps found - you already cover your best-fit roles well.",
+                   "Keine fachlichen Lücken gefunden - Sie decken Ihre Best-Match-Rollen bereits gut ab."))
 
     st.markdown("---")
 
     # Administrative / profile-setup areas
-    st.markdown("### 🗂️ Administrative & profile areas to improve")
+    st.markdown(tr("### 🗂️ Administrative & profile areas to improve", "### 🗂️ Administrative & Profil-Bereiche"))
     admin = result["admin"]
     if admin:
         for item in admin:
-            badge = {"high": "🔴 High", "medium": "🟠 Medium", "low": "🟡 Low"}[item["priority"]]
+            badge = {"high": tr("🔴 High", "🔴 Hoch"), "medium": tr("🟠 Medium", "🟠 Mittel"), "low": tr("🟡 Low", "🟡 Niedrig")}[item["priority"]]
             with st.container(border=True):
-                st.markdown(f"**{item['area']}** — `{badge}`")
+                st.markdown("**" + item["area"] + "** — `" + badge + "`")
                 st.caption(item["detail"])
-                st.markdown(f"→ **Suggestion:** {item['action']}")
+                st.markdown(tr("→ **Suggestion:** {}", "→ **Vorschlag:** {}").format(item["action"]))
     else:
-        st.info("Your profile and preferences are complete - nothing to do here.")
+        st.info(tr("Your profile and preferences are complete - nothing to do here.",
+                   "Ihr Profil und Ihre Präferenzen sind vollständig - hier gibt es nichts zu tun."))
 
 
 def show_matches(matches, jobs=None, profile=None):
     """Display job matches with scores, explanations, and per-job improvement areas."""
 
-    st.subheader("Matching Results")
+    st.subheader(tr("Matching Results", "Matching-Ergebnisse"))
 
     # Cache one engine per page interaction for per-job improvement hints.
     if "assessment_engine" not in st.session_state:
@@ -1086,16 +1259,16 @@ def show_matches(matches, jobs=None, profile=None):
 
                 # Mandatory requirement status
                 if mandatory_met:
-                    st.success("✅ Meets mandatory requirements")
+                    st.success(tr("✅ Meets mandatory requirements", "✅ Erfüllt Pflichtanforderungen"))
                 else:
-                    st.error("❌ Does NOT meet mandatory requirements")
+                    st.error(tr("❌ Does NOT meet mandatory requirements", "❌ Erfüllt Pflichtanforderungen NICHT"))
 
             with col2:
                 st.markdown(f"### {score}%")
-                st.caption("Match Score")
+                st.caption(tr("Match Score", "Match-Punktzahl"))
 
             # Score breakdown
-            with st.expander("📊 Score Breakdown"):
+            with st.expander(tr("📊 Score Breakdown", "📊 Punkte-Aufschlüsselung")):
                 breakdown = match.get("score_breakdown", {})
 
                 for criterion, value in breakdown.items():
@@ -1106,7 +1279,7 @@ def show_matches(matches, jobs=None, profile=None):
             # Explainable preference compatibility
             preference_checks = match.get("preference_checks", [])
             if preference_checks:
-                with st.expander("🎯 Why this job matches your preferences"):
+                with st.expander(tr("🎯 Why this job matches your preferences", "🎯 Warum dieser Job zu Ihren Präferenzen passt")):
                     for check in preference_checks:
                         status = check.get("status", "info")
                         text = check.get("text", "")
@@ -1122,22 +1295,24 @@ def show_matches(matches, jobs=None, profile=None):
                 job = job_by_id[match["job_id"]]
                 short = engine.short_for_job(profile, job, active_prefs)
                 if short:
-                    with st.expander("📈 Areas to improve for this role"):
-                        st.caption("Based only on job-relevant gaps between your profile and this position.")
+                    with st.expander(tr("📈 Areas to improve for this role", "📈 Verbesserungsbereiche für diese Rolle")):
+                        st.caption(tr("Based only on job-relevant gaps between your profile and this position.",
+                                      "Basiert nur auf jobspezifischen Lücken zwischen Ihrem Profil und dieser Position."))
                         for line in short:
                             st.markdown(f"- {line}")
 
             # Explanation (AI-generated)
             if match.get("explanation"):
-                with st.expander("💬 Why this match?"):
+                with st.expander(tr("💬 Why this match?", "💬 Warum dieser Treffer?")):
                     st.write(match["explanation"])
-            
+
             # Select job button
             if mandatory_met:
-                if st.button(f"📝 Select this Job", key=f"select_{match['job_id']}", type="primary"):
+                if st.button(tr("📝 Select this Job", "📝 Diesen Job auswählen"), key=f"select_{match['job_id']}", type="primary"):
                     st.session_state.selected_job = match
-                    st.success(f"Selected: {match['job_title']} at {match['company']}")
-                    st.info("Go to **Application Agent** to generate your application materials.")
+                    st.success(tr("Selected: {} at {}", "Ausgewählt: {} bei {}").format(match['job_title'], match['company']))
+                    st.info(tr("Go to **Application Agent** to generate your application materials.",
+                               "Gehen Sie zum **Bewerbungsagenten**, um Ihre Bewerbungsunterlagen zu erstellen."))
             
             st.markdown("---")
 
@@ -1145,17 +1320,18 @@ def show_matches(matches, jobs=None, profile=None):
 def show_application_page(sample_jobs, use_ai):
     """Application Agent page."""
     
-    st.title("📝 Application Agent")
+    st.title(tr("📝 Application Agent", "📝 Bewerbungsagent"))
     st.markdown("---")
     
     if not st.session_state.current_profile:
-        st.warning("⚠️ No candidate profile yet. Please extract a profile first on the **Candidate Profile** page.")
+        st.warning(tr("⚠️ No candidate profile yet. Please extract a profile first on the **Candidate Profile** page.",
+                      "⚠️ Noch kein Kandidatenprofil. Bitte extrahieren Sie zuerst auf der Seite **Kandidatenprofil** ein Profil."))
         return
     
     profile = st.session_state.current_profile
     
     # Let user pick which job to apply for
-    st.subheader("Select Job for Application")
+    st.subheader(tr("Select Job for Application", "Job für die Bewerbung auswählen"))
     
     # Build dropdown of jobs
     job_options = {}
@@ -1163,7 +1339,7 @@ def show_application_page(sample_jobs, use_ai):
         label = f"{job['title']} - {job['company']}"
         job_options[label] = job
     
-    selected_label = st.selectbox("Choose a job:", list(job_options.keys()))
+    selected_label = st.selectbox(tr("Choose a job:", "Wählen Sie einen Job:"), list(job_options.keys()))
     
     if selected_label:
         selected_job = job_options[selected_label]
@@ -1175,23 +1351,23 @@ def show_application_page(sample_jobs, use_ai):
             st.write(selected_job["description"])
         with col2:
             details = selected_job.get("details", {})
-            st.markdown("**Position Details:**")
+            st.markdown(tr("**Position Details:**", "**Positionsdetails:**"))
             for key, value in details.items():
                 st.markdown(f"- **{key.replace('_', ' ').title()}:** {value}")
         
         st.markdown("---")
         
-        generate_button = st.button("✨ Generate Application", type="primary")
+        generate_button = st.button(tr("✨ Generate Application", "✨ Bewerbung erstellen"), type="primary")
         
         if generate_button:
-            with st.spinner("Application Agent is preparing your application materials..."):
+            with st.spinner(tr("Application Agent is preparing your application materials...", "Der Bewerbungsagent bereitet Ihre Bewerbungsunterlagen vor...")):
                 application_agent = ApplicationAgent()
                 
                 result = application_agent.generate_application(profile, selected_job, use_ai=use_ai)
                 
                 st.session_state.current_application = result
                 st.session_state.current_application_job = selected_job
-                st.success("✅ Application materials generated!")
+                st.success(tr("✅ Application materials generated!", "✅ Bewerbungsunterlagen erstellt!"))
         
         # Display generated application
         if "current_application" in st.session_state and st.session_state.current_application_job:
@@ -1199,66 +1375,81 @@ def show_application_page(sample_jobs, use_ai):
                 result = st.session_state.current_application
                 
                 # Cover letter
-                tab1, tab2, tab3 = st.tabs(["💌 Cover Letter", "📄 CV Summary", "📋 Guidelines"])
+                tab1, tab2, tab3 = st.tabs([tr("💌 Cover Letter", "💌 Anschreiben"), tr("📄 CV Summary", "📄 CV-Zusammenfassung"), tr("📋 Guidelines", "📋 Richtlinien")])
                 
                 with tab1:
-                    st.subheader("Cover Letter")
+                    st.subheader(tr("Cover Letter", "Anschreiben"))
                     st.write(result["cover_letter"])
                     
                     # Edit capability
-                    if st.button("📝 Edit Cover Letter"):
+                    if st.button(tr("📝 Edit Cover Letter", "📝 Anschreiben bearbeiten")):
                         st.session_state.editing_letter = True
                     
                     if st.session_state.get("editing_letter", False):
                         edited = st.text_area(
-                            "Edit your cover letter:",
+                            tr("Edit your cover letter:", "Bearbeiten Sie Ihr Anschreiben:"),
                             value=result["cover_letter"],
                             height=300
                         )
-                        if st.button("💾 Save Edits"):
+                        if st.button(tr("💾 Save Edits", "💾 Änderungen speichern")):
                             result["cover_letter"] = edited
                             st.session_state.editing_letter = False
-                            st.success("✓ Cover letter saved!")
+                            st.success(tr("✓ Cover letter saved!", "✓ Anschreiben gespeichert!"))
                 
                 with tab2:
-                    st.subheader("CV Summary")
+                    st.subheader(tr("CV Summary", "CV-Zusammenfassung"))
                     st.info(result["cv_summary"])
                 
                 with tab3:
-                    st.subheader("Application Guidelines")
+                    st.subheader(tr("Application Guidelines", "Bewerbungsrichtlinien"))
                     st.write(result["application_notes"])
                 
                 st.markdown("---")
                 
                 # Approval workflow
-                st.subheader("✅ Candidate Approval Required")
-                st.markdown("""
+                st.subheader(tr("✅ Candidate Approval Required", "✅ Freigabe der Kandidatin erforderlich"))
+                st.markdown(tr("""
                 Before you can submit this application, please review all materials carefully.
                 
                 MATCHA does **NOT** automatically submit applications.
-                """)
+                """,
+                """
+                Bevor Sie diese Bewerbung absenden können, prüfen Sie bitte alle Unterlagen sorgfältig.
                 
-                approve = st.checkbox("I have reviewed all information and approve this application")
+                MATCHA sendet Bewerbungen **NICHT** automatisch ab.
+                """))
+
+                approve = st.checkbox(tr("I have reviewed all information and approve this application",
+                                         "Ich habe alle Informationen geprüft und genehmige diese Bewerbung"))
                 
                 if approve:
-                    st.success("✅ Application approved! Review complete.")
-                    st.info("📤 In a real deployment, this application would now be sent to the recruiter for review. No automated email submission occurs in this demo.")
+                    st.success(tr("✅ Application approved! Review complete.", "✅ Bewerbung genehmigt! Prüfung abgeschlossen."))
+                    st.info(tr("📤 In a real deployment, this application would now be sent to the recruiter for review. No automated email submission occurs in this demo.",
+                               "📤 In einer echten Bereitstellung würde diese Bewerbung nun zur Prüfung an die Recruiterin gesendet. In dieser Demo erfolgt keine automatisierte E-Mail-Übermittlung."))
                     
-                    if st.button("🔒 Send to Recruiter Review (Demo)"):
-                        st.success("🎉 Application sent to Recruiter Review Queue!")
-                        st.markdown("""
+                    if st.button(tr("🔒 Send to Recruiter Review (Demo)", "🔒 An Recruiter-Prüfung senden (Demo)")):
+                        st.success(tr("🎉 Application sent to Recruiter Review Queue!", "🎉 Bewerbung in die Recruiter-Prüfungswarteschlange gesendet!"))
+                        st.markdown(tr("""
                         ### Next Steps in the Recruitment Process:
                         1. ✅ Application received
                         2. 📋 Human reviewer will assess application
                         3. 💬 Interview scheduling (human decision)
                         4. 🤝 Final hiring decision (HUMAN only)
-                        """)
+                        """,
+                        """
+                        ### Nächste Schritte im Einstellungsprozess:
+                        1. ✅ Bewerbung eingegangen
+                        2. 📋 Eine menschliche Prüferin bewertet die Bewerbung
+                        3. 💬 Interview-Terminplanung (menschliche Entscheidung)
+                        4. 🤝 Endgültige Einstellungsentscheidung (NUR menschlich)
+                        """))
                 else:
-                    st.warning("⚠️ You must review and approve the application before it can be sent.")
+                    st.warning(tr("⚠️ You must review and approve the application before it can be sent.",
+                                  "⚠️ Sie müssen die Bewerbung prüfen und genehmigen, bevor sie gesendet werden kann."))
         
         # Show disclaimer always
-        with st.expander("⚠️ Important Disclaimer"):
-            st.markdown("""
+        with st.expander(tr("⚠️ Important Disclaimer", "⚠️ Wichtiger Hinweis")):
+            st.markdown(tr("""
             **MATCHA Application Agent Disclaimer:**
             
             - All application materials are generated using **verified candidate information only**
@@ -1266,7 +1457,16 @@ def show_application_page(sample_jobs, use_ai):
             - The candidate **must approve** the application before it is sent
             - Applications are **never automatically submitted** to employers
             - MATCHA assists but does **not** replace human recruiters
-            """)
+            """,
+            """
+            **MATCHA-Bewerbungsagent-Hinweis:**
+
+            - Alle Bewerbungsunterlagen werden nur mit **verifizierten Kandidateninformationen** erstellt
+            - Die KI **erfindet nie** Erfahrungen, Qualifikationen, Fähigkeiten oder Erfolge
+            - Die Kandidatin **muss** die Bewerbung genehmigen, bevor sie gesendet wird
+            - Bewerbungen werden **nie automatisch** an Arbeitgeber übermittelt
+            - MATCHA unterstützt, ersetzt aber **nicht** menschliche Recruiterinnen
+            """))
 
 
 if __name__ == "__main__":
