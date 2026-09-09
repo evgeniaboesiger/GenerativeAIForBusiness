@@ -22,7 +22,9 @@ Extraction result sources:
 """
 
 import io
+import os
 import re
+import shutil
 from dataclasses import dataclass
 
 try:
@@ -84,8 +86,24 @@ class OCREngine:
         import PIL.Image  # noqa: F401
         import pymupdf  # noqa: F401
         import pytesseract
-
+        pytesseract.pytesseract.tesseract_cmd = self._resolve_tesseract_cmd()
         return PIL.Image, pymupdf, pytesseract
+
+    @staticmethod
+    def _resolve_tesseract_cmd() -> str:
+        """Locate the Tesseract binary (PATH plus common Windows installs).
+
+        The ub-mannheim Windows installer often leaves Tesseract off the
+        PATH, so fall back to its standard install locations.
+        """
+        on_path = shutil.which("tesseract")
+        if on_path:
+            return on_path
+        for candidate in (r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                          r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"):
+            if os.path.isfile(candidate):
+                return candidate
+        return "tesseract"
 
     def available(self) -> bool:
         """True when Tesseract + rasterization libs are usable."""

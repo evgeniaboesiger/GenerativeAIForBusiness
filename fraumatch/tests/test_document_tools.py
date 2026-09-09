@@ -162,8 +162,12 @@ def test_pdf_scanned_uses_ocr_fallback():
 
 
 def test_pdf_ocr_missing_engine():
-    result = extract_cv_text(make_scan_pdf(), "anna.pdf")
-    # No Tesseract binary in CI/lab -> OCR unavailable -> reported clearly.
+    class UnavailableEngine:
+        def available(self) -> bool:
+            return False
+
+    result = extract_cv_text(make_scan_pdf(), "anna.pdf", ocr_engine=UnavailableEngine())
+    # OCR engine unavailable -> reported clearly instead of misreporting.
     assert result.source == "pdf_ocr_missing"
     assert result.text == ""
 
@@ -202,3 +206,24 @@ def test_profile_agent_extract_from_scanned_pdf():
     assert meta["ocr_used"] is True
     assert "ANNA" in profile["personal_info"]["name"].upper()
     assert "weber" in profile["personal_info"]["email"]
+
+
+# ---------------------------------------------------------------------- #
+#  Tesseract binary resolution
+# ---------------------------------------------------------------------- #
+def test_resolve_tesseract_cmd_uses_path(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: "/usr/bin/tesseract")
+    assert OCREngine._resolve_tesseract_cmd() == "/usr/bin/tesseract"
+
+
+def test_resolve_tesseract_cmd_uses_standard_windows_path(monkeypatch):
+    exe = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    monkeypatch.setattr("os.path.isfile", lambda p: p == exe)
+    assert OCREngine._resolve_tesseract_cmd() == exe
+
+
+def test_resolve_tesseract_cmd_falls_back_to_bare_command(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda _: None)
+    monkeypatch.setattr("os.path.isfile", lambda _p: False)
+    assert OCREngine._resolve_tesseract_cmd() == "tesseract"
