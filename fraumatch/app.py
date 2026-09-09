@@ -286,19 +286,16 @@ def show_account_page():
     st.subheader(tr("Account details", "Kontodetails"))
 
     # Editable display name - saved back to the account (email stays immutable).
+    # In view mode the name is plain text so the Edit button aligns with it;
+    # in edit mode an editable field appears next to Save / Cancel.
     editing_name = st.session_state.get("editing_name", False)
-    col1, col2, col3 = st.columns([3, 1, 1])
-    with col1:
-        name_value = st.text_input(tr("Name", "Name"),
-                                   value=user["full_name"],
-                                   key="account_name",
-                                   disabled=not editing_name)
-    with col2:
-        if not editing_name:
-            if st.button(tr("✏️ Edit", "✏️ Bearbeiten"), use_container_width=True, key="edit_name_btn"):
-                st.session_state.editing_name = True
-                st.rerun()
-        else:
+    if editing_name:
+        col1, col2, col3 = st.columns([3, 1, 1])
+        with col1:
+            st.text_input(tr("Name", "Name"),
+                          value=user["full_name"],
+                          key="account_name")
+        with col2:
             if st.button(tr("💾 Save", "💾 Speichern"), use_container_width=True, key="save_name_btn", type="primary"):
                 new_name = (st.session_state.get("account_name") or "").strip()
                 if new_name:
@@ -308,11 +305,18 @@ def show_account_page():
                     st.rerun()
                 else:
                     st.error(tr("Name cannot be empty.", "Der Name darf nicht leer sein."))
-    with col3:
-        if editing_name:
+        with col3:
             if st.button(tr("Cancel", "Abbrechen"), use_container_width=True, key="cancel_name_btn"):
-                st.session_state.account_name = user["full_name"]
+                st.session_state.pop("account_name", None)
                 st.session_state.editing_name = False
+                st.rerun()
+    else:
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**{tr('Name', 'Name')}**\n\n{user['full_name']}")
+        with col2:
+            if st.button(tr("✏️ Edit", "✏️ Bearbeiten"), use_container_width=True, key="edit_name_btn"):
+                st.session_state.editing_name = True
                 st.rerun()
 
     col1, col2 = st.columns(2)
