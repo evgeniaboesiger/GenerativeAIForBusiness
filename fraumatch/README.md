@@ -79,7 +79,7 @@ After logging in, the app has **7 pages** in the left sidebar:
 
 | Page | What it does |
 |------|--------------|
-| **Dashboard** | Live overview of the demo data (real vacancy count, sample profiles, your profile status), matching weights, shortcuts to every page, and the matching-efficiency experiment |
+| **Dashboard** | "What you can do in MATCHA" shortcut cards to every page, matching weights, project overview, and the matching-efficiency experiment |
 | **Candidate Profile** | Upload a CV (PDF/Word/TXT), use a sample CV, or paste text → watch the structured profile extraction |
 | **Career Goals** | Onboarding wizard for explicit work preferences (employment %, salary, location, remote, career goals…) — see below |
 | **Job Matching** | Find matching jobs → ranked results with scores, explanations & preference checks |
@@ -137,7 +137,7 @@ The UI tells the candidate: *"Your preferences describe the type of work environ
 ### Demo Flow for Class (Suggested Script)
 
 0. **Register** a test account (e.g., `demo@matcha.ch`) → show the profile dashboard
-1. **Dashboard** — Show the project overview, the **live demo-data overview** (vacancy count + sample profiles, all real data), the matching weights (30% skills, 20% experience, etc.), and the **"What you can do in MATCHA"** shortcut cards → click **Open** to jump straight into a page
+1. **Dashboard** — Show the project overview, the matching weights (30% skills, 20% experience, etc.), and the **"What you can do in MATCHA"** shortcut cards → click **Open** to jump straight into a page
 2. **Candidate Profile** — Pick "Sophie Müller" → show the extracted profile → click **💾 Save to my account**
 3. **Career Goals** — Fill in the wizard → show the Review & Confirm summary → save → show the ethics note ("preferences, not personality")
 4. **Job Matching** — Click **Find Matching Jobs** → expand **"🎯 Why this job matches your preferences"** to show ✓/⚠ preference checks, and **"📈 Areas to improve for this role"** for the per-job gaps

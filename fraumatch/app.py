@@ -332,31 +332,30 @@ def show_account_page():
 
 
 def show_dashboard():
-    """Main dashboard: live overview + shortcuts to every real page of the app."""
+    """Main dashboard: shortcuts to every real page of the app."""
     st.title("👩‍💼 MATCHA Dashboard")
-    st.markdown("---")
-
-    # Live overview - real numbers only, read from the demo data files
-    sample_cvs = load_sample_cvs()
-    sample_jobs = load_sample_jobs()
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("🎯 Demo vacancies", len(sample_jobs))
-    with col2:
-        st.metric("📄 Sample profiles", len(sample_cvs))
-    with col3:
-        profile_loaded = st.session_state.current_profile is not None
-        st.metric("👤 My profile", "Loaded" if profile_loaded else "Not set")
-
     st.markdown("---")
 
     # What MATCHA actually does - every card maps to a real page in the app
     st.subheader("🚀 What you can do in MATCHA")
+
     st.markdown(
-        "Each card below is a real page in the app - click **Open** and it takes you there. "
-        "Matching and recommendations use only the **{} structured demo vacancies** "
-        "in `data/sample_jobs.json`.".format(len(sample_jobs))
+        """
+        <style>
+        [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] {
+            height: 100%;
+        }
+        [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] > [data-testid="stVerticalBlock"] {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        [data-testid="stColumn"] [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stButton"] {
+            margin-top: auto;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
     )
 
     app_pages = [
@@ -371,11 +370,12 @@ def show_dashboard():
     cards = st.columns(3)
     for i, (page_name, page_desc) in enumerate(app_pages):
         with cards[i % 3]:
-            st.markdown(f"#### {page_name}")
-            st.markdown(page_desc)
-            if st.button("Open", key=f"open_page_{i}"):
-                st.session_state._open_page = page_name
-                st.rerun()
+            with st.container(border=True):
+                st.markdown(f"#### {page_name}")
+                st.markdown(page_desc)
+                if st.button("Open", key=f"open_page_{i}"):
+                    st.session_state._open_page = page_name
+                    st.rerun()
 
     st.markdown("---")
     
