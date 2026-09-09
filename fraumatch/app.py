@@ -129,6 +129,12 @@ def main():
     """Main application entry point."""
     init_session()
 
+    # Honour a pending navigation request from the Dashboard shortcuts.
+    # Must happen before the sidebar radio widget is instantiated.
+    pending_page = st.session_state.pop("_open_page", None)
+    if pending_page is not None:
+        st.session_state.nav_page = pending_page
+
     # Sidebar - navigation
     st.sidebar.title("🤝 MATCHA")
     st.sidebar.markdown("*Smart Job Matching for Women in Switzerland*")
@@ -147,7 +153,8 @@ def main():
     page = st.sidebar.radio(
         "Navigate",
         ["🏠 Dashboard", "👤 Candidate Profile", "🎯 Career Goals",
-         "🎯 Job Matching", "📈 Areas to Improve", "📝 Application Agent", "🔐 My Account"]
+         "🎯 Job Matching", "📈 Areas to Improve", "📝 Application Agent", "🔐 My Account"],
+        key="nav_page"
     )
     
     # Logout button
@@ -325,21 +332,51 @@ def show_account_page():
 
 
 def show_dashboard():
-    """Main dashboard with overview and impact metrics."""
-    
+    """Main dashboard: live overview + shortcuts to every real page of the app."""
     st.title("👩‍💼 MATCHA Dashboard")
     st.markdown("---")
-    
-    # Hero section
+
+    # Live overview - real numbers only, read from the demo data files
+    sample_cvs = load_sample_cvs()
+    sample_jobs = load_sample_jobs()
+
     col1, col2, col3 = st.columns(3)
-    
     with col1:
-        st.metric("Total Candidates", "4", "Demo Data")
+        st.metric("🎯 Demo vacancies", len(sample_jobs))
     with col2:
-        st.metric("Open Positions", "8", "Demo Data")
+        st.metric("📄 Sample profiles", len(sample_cvs))
     with col3:
-        st.metric("Match Success Rate", "72%", "↑ 5%")
-    
+        profile_loaded = st.session_state.current_profile is not None
+        st.metric("👤 My profile", "Loaded" if profile_loaded else "Not set")
+
+    st.markdown("---")
+
+    # What MATCHA actually does - every card maps to a real page in the app
+    st.subheader("🚀 What you can do in MATCHA")
+    st.markdown(
+        "Each card below is a real page in the app - click **Open** and it takes you there. "
+        "Matching and recommendations use only the **{} structured demo vacancies** "
+        "in `data/sample_jobs.json`.".format(len(sample_jobs))
+    )
+
+    app_pages = [
+        ("👤 Candidate Profile", "Upload a CV or pick one of the sample profiles, then watch the structured profile extraction."),
+        ("🎯 Career Goals", "Tell MATCHA your work preferences (location, remote, employment %, salary, goals) in the onboarding wizard."),
+        ("🎯 Job Matching", "Rank your best-fit demo vacancies with explainable scores, preference checks and per-job tips."),
+        ("📈 Areas to Improve", "Get prioritized, job-relevant recommendations - professional and administrative - before you apply."),
+        ("📝 Application Agent", "Generate a tailored cover letter and CV summary from verified facts, review and approve it."),
+        ("🔐 My Account", "Inspect the profile and preferences saved under your account and reload them anytime."),
+    ]
+
+    cards = st.columns(3)
+    for i, (page_name, page_desc) in enumerate(app_pages):
+        with cards[i % 3]:
+            st.markdown(f"#### {page_name}")
+            st.markdown(page_desc)
+            if st.button("Open", key=f"open_page_{i}"):
+                st.session_state._open_page = page_name
+                st.rerun()
+
     st.markdown("---")
     
     # Project overview
