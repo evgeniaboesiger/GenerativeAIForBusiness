@@ -108,10 +108,11 @@ def main():
     st.sidebar.title("🤝 MATCHA")
     st.sidebar.markdown(tr("*Smart Job Matching for Women in Switzerland*",
                            "*Smartes Job-Matching für Frauen in der Schweiz*"))
-    lang = st.sidebar.selectbox(
+    lang = st.sidebar.radio(
         tr("Language", "Sprache"),
         list(SUPPORTED_LANGUAGES),
         format_func=lambda code: SUPPORTED_LANGUAGES[code],
+        horizontal=True,
         key="lang",
     )
     st.sidebar.markdown("---")
