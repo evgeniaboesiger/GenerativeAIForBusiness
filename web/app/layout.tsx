@@ -1,4 +1,5 @@
 import '../styles/globals.css'
+import Link from 'next/link'
 
 export const metadata = {
   title: 'FRAUMATCH',
@@ -14,9 +15,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="max-w-7xl mx-auto flex items-center justify-between">
               <div className="text-2xl font-semibold text-navy">FRAUMATCH</div>
               <nav className="space-x-4 text-sm text-navy">
-                <a href="/" className="hover:underline">Home</a>
-                <a href="/login" className="hover:underline">Login</a>
-                <a href="/register" className="hover:underline">Register</a>
+                <Link href="/" className="hover:underline">Home</Link>
+                <Link href="/login" className="hover:underline">Login</Link>
+                <Link href="/register" className="hover:underline">Register</Link>
               </nav>
             </div>
           </header>

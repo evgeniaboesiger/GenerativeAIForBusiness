@@ -21,6 +21,7 @@ from app.matching.tiers import (
     has_tiers,
     job_employment_range,
     job_has_weekend_work,
+    job_remote_level,
 )
 
 ALGORITHM_VERSION = "2.1"
@@ -91,20 +92,33 @@ def _level_to_score(level: str) -> int:
     return mapping.get(level, 0)
 
 
+def _safe_name(value) -> str:
+    """Return a lowercase name for a skill entry, or '' for malformed data."""
+    if isinstance(value, dict):
+        value = value.get("skill")
+    if not isinstance(value, str):
+        return ""
+    return value.strip().lower()
+
+
 def compute_skills_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> Tuple[float, List[str], List[str]]:
     required = job.get("required_skills") or []
     preferred = job.get("preferred_skills") or []
-    cand_skills = [s["skill"].lower() if isinstance(s, dict) else s.lower() for s in candidate.get("skills", [])]
+    cand_skills = [_safe_name(s) for s in candidate.get("skills", [])]
 
     # normalize required and preferred skill representations (allow dict or plain string)
-    required_names = [r.get("skill").lower() if isinstance(r, dict) else r.lower() for r in required]
-    preferred_names = [p.get("skill").lower() if isinstance(p, dict) else p.lower() for p in preferred]
+    required_names = [_safe_name(r) for r in required]
+    preferred_names = [_safe_name(p) for p in preferred]
+    # malformed entries (None / missing 'skill') can never match and must not
+    # count in the denominator, otherwise they silently drag the score down.
+    req_valid = [n for n in required_names if n]
+    pref_valid = [n for n in preferred_names if n]
 
-    req_found = [r for r in required_names if r in cand_skills]
-    pref_found = [p for p in preferred_names if p in cand_skills]
+    req_found = [r for r in req_valid if r in cand_skills]
+    pref_found = [p for p in pref_valid if p in cand_skills]
 
-    req_score = (len(req_found) / max(1, len(required))) if required else 1.0
-    pref_score = (len(pref_found) / max(1, len(preferred))) if preferred else 0.0
+    req_score = (len(req_found) / len(req_valid)) if req_valid else 1.0
+    pref_score = (len(pref_found) / len(pref_valid)) if pref_valid else 0.0
 
     # required skills more important (75% within skills component)
     skills_pct = req_score * 0.75 + pref_score * 0.25
@@ -185,10 +199,13 @@ def compute_location_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> fl
 
 
 def compute_employment_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
-    cmin = candidate.get("employment_percentage_min", 50)
-    cmax = candidate.get("employment_percentage_max", 100)
-    jmin = job.get("employment_percentage_min") or job.get("employment_percentage") or 50
-    jmax = job.get("employment_percentage_max") or job.get("employment_percentage") or 100
+    cmin = candidate.get("employment_percentage_min") or 50
+    cmax = candidate.get("employment_percentage_max") or 100
+    job_range = job_employment_range(job)
+    if job_range is None:
+        # no employment data on the job -> unknown, treat as fully flexible (neutral)
+        return 100.0
+    jmin, jmax = job_range
 
     # full if ranges overlap strongly
     if cmin <= jmin and cmax >= jmax:
@@ -198,14 +215,15 @@ def compute_employment_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> 
     overlap_max = min(cmax, jmax)
     if overlap_max >= overlap_min:
         # proportional to overlap fraction
-        overlap_fraction = (overlap_max - overlap_min) / max(1, (jmax - jmin)) if (jmax - jmin) > 0 else 1
+        jspan = jmax - jmin if jmax > jmin else max(1, (cmax - cmin))
+        overlap_fraction = (overlap_max - overlap_min) / max(1, jspan)
         return round(min(100, overlap_fraction * 100 + 50), 2)
     return 20.0
 
 
 def compute_salary_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
-    cmin = candidate.get("salary_expectation_min", 0)
-    cmax = candidate.get("salary_expectation_max", 9999999)
+    cmin = candidate.get("salary_expectation_min") or 0
+    cmax = candidate.get("salary_expectation_max") or 9999999
     jmin = job.get("salary_min") or 0
     jmax = job.get("salary_max") or 9999999
 
@@ -359,12 +377,12 @@ def check_mandatory_requirements(candidate: Dict[str, Any], job: Dict[str, Any])
 
     # mandatory skills: treat required_skills as mandatory if marked so in job (we expect job to mark some as mandatory)
     required = job.get("required_skills") or []
-    cand_skills = [s["skill"].lower() if isinstance(s, dict) else s.lower() for s in candidate.get("skills", [])]
+    cand_skills = [_safe_name(s) for s in candidate.get("skills", [])]
     # job.required_skills can be list of {skill, mandatory}
     for r in required:
         if isinstance(r, dict):
             skill_name = r.get("skill")
-            if r.get("mandatory") and skill_name.lower() not in cand_skills:
+            if r.get("mandatory") and skill_name and _safe_name(skill_name) not in cand_skills:
                 missing.append(f"Missing mandatory skill: {skill_name}")
         else:
             # if plain string treat as required but not mandatory by default
@@ -387,47 +405,60 @@ def check_mandatory_requirements(candidate: Dict[str, Any], job: Dict[str, Any])
 # HARD CONSTRAINTS (deal-breakers) - beyond the existing mandatory gate
 # --------------------------------------------------------------------------- #
 def check_hard_constraints(candidate: Dict[str, Any], job: Dict[str, Any],
-                           mandatory_met: bool, mandatory_reasons: List[str]) -> Tuple[bool, List[str]]:
+                           mandatory_met: bool, mandatory_reasons: List[str],
+                           skip_practical_dims: set = None) -> Tuple[bool, List[str]]:
     """Return (passed, violations) for deal-breaker constraints.
 
     Existing 'mandatory' gating (languages/skills/education) is combined with
     new practical deal-breakers: salary floor, workload %, commute limit, and
     weekend work. A single violation means the job is not recommended.
+
+    ``skip_practical_dims`` lists the practical dimensions the candidate has
+    expressed with Ideal/Acceptable/Deal-breaker tiers; when a dimension has
+    tiers, the scalar (P1) constraint for that dimension is superseded so the
+    two layers cannot contradict each other.
     """
+    skip_practical_dims = skip_practical_dims or set()
     violations = list(mandatory_reasons) if not mandatory_met else []
 
     # 1. Salary floor: candidate will not go below their minimum.
-    cmin = candidate.get("salary_expectation_min", 0)
-    jmax = job.get("salary_max")
-    if cmin and jmax is not None and cmin > jmax:
-        violations.append(
-            f"Salary deal-breaker: you need at least CHF {cmin:,}, "
-            f"but this job tops out at CHF {jmax:,}."
-        )
-
-    # 2. Workload %: candidate's required percentage must overlap the job's.
-    cmax = candidate.get("employment_percentage_max")
-    cmin_emp = candidate.get("employment_percentage_min")
-    jmin_emp, jmax_emp = job_employment_range(job)
-    if cmax is not None and cmin_emp is not None:
-        if cmax < jmin_emp or cmin_emp > jmax_emp:
+    if "salary" not in skip_practical_dims:
+        cmin = candidate.get("salary_expectation_min", 0)
+        jmax = job.get("salary_max")
+        if cmin and jmax is not None and cmin > jmax:
             violations.append(
-                f"Workload deal-breaker: you're available for {cmin_emp}–{cmax}%, "
-                f"but this role requires {jmin_emp}–{jmax_emp}%."
+                f"Salary deal-breaker: you need at least CHF {cmin:,}, "
+                f"but this job tops out at CHF {jmax:,}."
             )
 
+    # 2. Workload %: candidate's required percentage must overlap the job's.
+    if "employment_percentage" not in skip_practical_dims:
+        cmax = candidate.get("employment_percentage_max")
+        cmin_emp = candidate.get("employment_percentage_min")
+        job_range = job_employment_range(job)
+        if cmax is not None and cmin_emp is not None and job_range is not None:
+            jmin_emp, jmax_emp = job_range
+            if cmax < jmin_emp or cmin_emp > jmax_emp:
+                violations.append(
+                    f"Workload deal-breaker: you're available for {cmin_emp}–{cmax}%, "
+                    f"but this role requires {jmin_emp}–{jmax_emp}%."
+                )
+
     # 3. Commute limit: job too far given the candidate's maximum commute.
-    commute = commute_minutes(candidate.get("location"), job.get("location"))
-    max_commute = candidate.get("maximum_commute_minutes")
-    if max_commute and max_commute < commute:
-        violations.append(
-            f"Commute deal-breaker: up to {max_commute} min commute is acceptable, "
-            f"but this role is ~{commute} min away."
-        )
+    #    A fully remote role (>=70% remote) has no meaningful commute.
+    if "commute" not in skip_practical_dims and job_remote_level(job) != "remote":
+        commute = commute_minutes(candidate.get("location"), job.get("location"))
+        max_commute = candidate.get("maximum_commute_minutes")
+        if max_commute and max_commute < commute:
+            violations.append(
+                f"Commute deal-breaker: up to {max_commute} min commute is acceptable, "
+                f"but this role is ~{commute} min away."
+            )
 
     # 4. Weekend / unsociable hours.
-    if job_has_weekend_work(job):
-        violations.append("Scheduling deal-breaker: this role requires weekend or on-call work.")
+    if "weekend" not in skip_practical_dims:
+        if job_has_weekend_work(job):
+            violations.append("Scheduling deal-breaker: this role requires weekend or on-call work.")
 
     return (len(violations) == 0), violations
 
@@ -491,21 +522,29 @@ def score_candidate_job(candidate: Dict[str, Any], job: Dict[str, Any], assessme
     }
 
     mandatory_met, missing_reasons = check_mandatory_requirements(candidate, job)
-    dealbreakers_met, dealbreaker_reasons = check_hard_constraints(
-        candidate, job, mandatory_met, missing_reasons
-    )
 
     # P2: Ideal / Acceptable / Deal-breaker preference tiers. If the candidate
     # has set tiers, they override the scalar practical components (employment,
     # salary, location/commute, remote) and any tier deal-breaker is fused into
-    # the hard-constraint gate.
+    # the hard-constraint gate. Dimensions with tiers must supersede the scalar
+    # (P1) constraints so the two layers cannot contradict each other.
     preference_tiers_result = None
     if has_tiers(candidate):
         preference_tiers_result = evaluate_preference_tiers(candidate, job)
         components.update(preference_tiers_result.get("score_overrides") or {})
         tier_violations = preference_tiers_result.get("hard_constraint_violations") or []
-        dealbreaker_reasons = list(dict.fromkeys(dealbreaker_reasons + tier_violations))
-        dealbreakers_met = dealbreakers_met and preference_tiers_result.get("hard_constraints_met", True)
+        dealbreakers_met = preference_tiers_result.get("hard_constraints_met", True)
+        dealbreaker_reasons = list(dict.fromkeys(tier_violations))
+    else:
+        dealbreakers_met = True
+        dealbreaker_reasons = []
+
+    tiered_dims = set((preference_tiers_result.get("dimensions") or {}).keys()) if preference_tiers_result else set()
+    mandatory_ok, mandatory_violations = check_hard_constraints(
+        candidate, job, mandatory_met, missing_reasons, skip_practical_dims=tiered_dims
+    )
+    dealbreakers_met = dealbreakers_met and mandatory_ok
+    dealbreaker_reasons = list(dict.fromkeys(dealbreaker_reasons + mandatory_violations))
 
     # Fit buckets: visible, interpretable components.
     fit_buckets = compute_fit_buckets(components)

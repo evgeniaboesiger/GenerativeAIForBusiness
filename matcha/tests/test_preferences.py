@@ -632,3 +632,47 @@ def test_ai_explanation_uses_ollama_when_available(monkeypatch):
     explanation = agent._generate_ai_explanation(profile, job, score=0.85, pref_checks=[])
     assert fake.called, "requests.post should be reached when Ollama is available"
     assert "AI explanation generated" in explanation
+
+
+# ---------------------------------------------------------------------- #
+#  Loop 1 regression: multi-language mandatory requirements
+# ---------------------------------------------------------------------- #
+def test_mandatory_multi_language_requirement_requires_all_languages():
+    # Regression: "German and English fluent" only checked the first word,
+    # so candidates without English passed the mandatory gate.
+    job = make_job(requirements={"mandatory": ["German and English fluent"], "nice_to_have": []})
+
+    only_german = make_profile(languages=[{"language": "German", "level": "C1"}])
+    assert agent._check_mandatory_requirements(only_german, job) is False
+
+    both = make_profile(languages=[{"language": "German", "level": "C1"},
+                                   {"language": "English", "level": "C1"}])
+    assert agent._check_mandatory_requirements(both, job) is True
+
+
+def test_mandatory_single_language_still_works():
+    job = make_job(requirements={"mandatory": ["French B2 or native"], "nice_to_have": []})
+    ok = make_profile(languages=[{"language": "French", "level": "B2"}])
+    assert agent._check_mandatory_requirements(ok, job) is True
+    nok = make_profile(languages=[{"language": "German", "level": "C1"}])
+    assert agent._check_mandatory_requirements(nok, job) is False
+
+
+# ---------------------------------------------------------------------- #
+#  Loop 1 regression: "Flexible" employment target marks employment as
+#  flexible so the bucket scores 1.0 instead of a neutral 0.5
+# ---------------------------------------------------------------------- #
+def test_flexible_employment_target_marks_employment_flexible():
+    prefs = p.default_preferences()
+    prefs["employment_flexible"] = True  # derived from picking "Flexible"
+    norm = p.normalise_preferences(prefs)
+    assert norm["employment_flexible"] is True
+    assert p.employment_compatibility(
+        norm["preferred_employment_target"],
+        norm["preferred_employment_min"],
+        norm["preferred_employment_max"],
+        norm["employment_flexible"],
+        100, 100,
+    ) == 1.0
+    summary = dict(p.preferences_summary(norm))
+    assert summary["Employment level"] == "Flexible (open to any employment level)"

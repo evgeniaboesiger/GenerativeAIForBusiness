@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import Any, Dict
+from typing import Any, Dict, Optional, List
 from app.db import session as db_session
 from app.db import models
 from app.matching.engine import score_candidate_job
@@ -22,6 +23,16 @@ router = APIRouter()
 PROFILE_AGENT = ProfileAgent(model_name="demo-profile-agent")
 
 
+class CandidatePreferencesUpdate(BaseModel):
+    """Validated payload for PUT /api/candidates/{id}/preferences."""
+
+    preference_tiers: Optional[Dict[str, Any]] = None
+    salary_min: Optional[float] = Field(default=None, ge=0)
+    salary_max: Optional[float] = Field(default=None, ge=0)
+    remote_preference: Optional[str] = None
+    employment_percentage: Optional[int] = Field(default=None, ge=0, le=100)
+
+
 def get_db():
     db = db_session.SessionLocal()
     try:
@@ -34,6 +45,9 @@ def get_db():
 def extract_profile(payload: ProfileExtractionRequest, db: Session = Depends(get_db)):
     result = PROFILE_AGENT.extract_profile(payload.cv_text)
     if payload.candidate_id is not None:
+        exists = db.query(models.Candidate).filter(models.Candidate.id == payload.candidate_id).first()
+        if not exists:
+            raise HTTPException(status_code=404, detail="Candidate not found")
         extraction = models.ProfileExtraction(
             candidate_id=payload.candidate_id,
             source=payload.source,
@@ -61,6 +75,9 @@ def get_candidate_profile(candidate_id: int, db: Session = Depends(get_db)):
 def review_candidate_profile(candidate_id: int, payload: ProfileReviewUpdate, db: Session = Depends(get_db)):
     if payload.candidate_id != candidate_id:
         raise HTTPException(status_code=400, detail="Candidate id mismatch")
+
+    if not db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first():
+        raise HTTPException(status_code=404, detail="Candidate not found")
 
     review = models.ProfileReview(
         candidate_id=candidate_id,
@@ -100,7 +117,7 @@ def get_candidate(candidate_id: int, db: Session = Depends(get_db)):
         "id": c.id,
         "name": c.name,
         "location": c.location,
-        "years_experience": c.experiences and len(c.experiences) and sum([( (e.end_date.year if e.end_date else 2026) - (e.start_date.year if e.start_date else 0)) for e in c.experiences ]) or 0,
+        "years_experience": c.years_experience,
     }
 
 
@@ -121,23 +138,22 @@ def get_candidate_preferences(candidate_id: int, db: Session = Depends(get_db)):
 
 @router.put("/api/candidates/{candidate_id}/preferences")
 def update_candidate_preferences(
-    candidate_id: int, payload: Dict[str, Any], db: Session = Depends(get_db)
+    candidate_id: int, payload: CandidatePreferencesUpdate, db: Session = Depends(get_db)
 ):
     c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
     if not c:
         raise HTTPException(status_code=404, detail="Candidate not found")
 
-    tiers = payload.get("preference_tiers")
-    if tiers is not None:
-        c.preference_tiers = tiers
-    if payload.get("salary_min") is not None:
-        c.salary_min = payload["salary_min"]
-    if payload.get("salary_max") is not None:
-        c.salary_max = payload["salary_max"]
-    if payload.get("remote_preference") is not None:
-        c.remote_preference = payload["remote_preference"]
-    if payload.get("employment_percentage") is not None:
-        c.employment_percentage = payload["employment_percentage"]
+    if payload.preference_tiers is not None:
+        c.preference_tiers = payload.preference_tiers
+    if payload.salary_min is not None:
+        c.salary_min = payload.salary_min
+    if payload.salary_max is not None:
+        c.salary_max = payload.salary_max
+    if payload.remote_preference is not None:
+        c.remote_preference = payload.remote_preference
+    if payload.employment_percentage is not None:
+        c.employment_percentage = payload.employment_percentage
     db.commit()
     db.refresh(c)
     return {
@@ -150,6 +166,34 @@ def update_candidate_preferences(
     }
 
 
+def _job_dict(j: models.Job) -> Dict[str, Any]:
+    """Build the engine-facing job dict from the ORM model.
+
+    ``employment_percentage_min/max`` mirror the job's declared (single)
+    employment percentage, or stay ``None`` so the engine treats an
+    unspecified workload as unknown/neutral instead of assuming full-time.
+    """
+    return {
+        "id": j.id,
+        "title": j.title,
+        "company": j.company,
+        "location": j.location,
+        "required_skills": j.required_skills,
+        "preferred_skills": j.preferred_skills,
+        "minimum_years_experience": j.minimum_years_experience,
+        "education_requirements": j.education_requirements,
+        "language_requirements": j.language_requirements,
+        "employment_percentage_min": j.employment_percentage,
+        "employment_percentage_max": j.employment_percentage,
+        "salary_min": j.salary_min,
+        "salary_max": j.salary_max,
+        "remote_percentage": getattr(j, 'remote_percentage', 0),
+        "department": getattr(j, 'department', None),
+        "company_values": getattr(j, 'company_values', None),
+        "personality_preferences": getattr(j, 'personality_preferences', None),
+    }
+
+
 @router.get("/api/jobs")
 def list_jobs(db: Session = Depends(get_db)):
     jobs = db.query(models.Job).all()
@@ -159,7 +203,9 @@ def list_jobs(db: Session = Depends(get_db)):
             "title": j.title,
             "company": j.company,
             "location": j.location,
-            "employment_percentage_min": j.minimum_years_experience if False else None,
+            "employment_percentage": j.employment_percentage,
+            "employment_percentage_min": j.employment_percentage,
+            "employment_percentage_max": j.employment_percentage,
         }
         for j in jobs
     ]
@@ -177,6 +223,10 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
         "location": j.location,
         "salary_min": j.salary_min,
         "salary_max": j.salary_max,
+        "employment_percentage": j.employment_percentage,
+        "employment_percentage_min": j.employment_percentage,
+        "employment_percentage_max": j.employment_percentage,
+        "remote_percentage": getattr(j, 'remote_percentage', 0),
         "required_skills": j.required_skills,
         "preferred_skills": j.preferred_skills,
     }
@@ -184,20 +234,20 @@ def get_job(job_id: int, db: Session = Depends(get_db)):
 
 def _candidate_dict(c: models.Candidate) -> Dict[str, Any]:
     """Build the engine-facing candidate dict from the ORM model."""
+    pct = c.employment_percentage
     return {
         "id": c.id,
         "name": c.name,
         "location": c.location,
-        "years_experience": sum([((e.end_date.year if e.end_date else 2026) - (e.start_date.year if e.start_date else 0)) for e in c.experiences]) if c.experiences else 0,
+        "years_experience": c.years_experience,
         "skills": [{"skill": s.skill, "level": s.level} for s in c.skills],
         "education": [{"degree": e.degree, "field": e.field} for e in c.education],
         "languages": [],
         "salary_expectation_min": getattr(c, 'salary_min', 0),
         "salary_expectation_max": getattr(c, 'salary_max', 9999999),
-        "employment_percentage_min": getattr(c, 'employment_percentage_min', 50),
-        "employment_percentage_max": getattr(c, 'employment_percentage_max', 100),
+        "employment_percentage_min": pct if pct is not None else 50,
+        "employment_percentage_max": pct if pct is not None else 100,
         "remote_preference": getattr(c, 'remote_preference', 'office'),
-        "maximum_commute_minutes": getattr(c, 'maximum_commute_minutes', 60),
         "career_goal": getattr(c, 'career_goal', ''),
         "desired_roles": getattr(c, 'desired_roles', []),
         "personality": getattr(c, 'personality', None),
@@ -208,7 +258,7 @@ def _candidate_dict(c: models.Candidate) -> Dict[str, Any]:
 
 @router.get("/api/matching/candidate/{candidate_id}/job/{job_id}")
 @router.post("/api/matching/candidate/{candidate_id}/job/{job_id}")
-def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(get_db)):
+def match_candidate_job(request: Request, candidate_id: int, job_id: int, db: Session = Depends(get_db)):
     c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
     j = db.query(models.Job).filter(models.Job.id == job_id).first()
     if not c or not j:
@@ -216,33 +266,16 @@ def match_candidate_job(candidate_id: int, job_id: int, db: Session = Depends(ge
 
     # build dicts for engine
     candidate = _candidate_dict(c)
-
-    job = {
-        "id": j.id,
-        "title": j.title,
-        "company": j.company,
-        "location": j.location,
-        "required_skills": j.required_skills,
-        "preferred_skills": j.preferred_skills,
-        "minimum_years_experience": j.minimum_years_experience,
-        "education_requirements": j.education_requirements,
-        "language_requirements": j.language_requirements,
-        "employment_percentage_min": None,
-        "employment_percentage_max": None,
-        "salary_min": j.salary_min,
-        "salary_max": j.salary_max,
-        "remote_percentage": getattr(j, 'remote_percentage', 0),
-        "department": getattr(j, 'department', None),
-        "company_values": getattr(j, 'company_values', None),
-        "personality_preferences": getattr(j, 'personality_preferences', None),
-    }
+    job = _job_dict(j)
 
     result = score_candidate_job(candidate, job)
 
-    # persist matching log
-    log = MatchingLog(candidate_id=candidate_id, job_id=job_id, execution_time_ms=result.get('execution_time_ms'), algorithm_version=result.get('algorithm_version'))
-    db.add(log)
-    db.commit()
+    # persist matching log on write operations only: a GET must not mutate
+    # the database (REST). The POST path is the explicit "run + record" call.
+    if request.method == "POST":
+        log = MatchingLog(candidate_id=candidate_id, job_id=job_id, execution_time_ms=result.get('execution_time_ms'), algorithm_version=result.get('algorithm_version'))
+        db.add(log)
+        db.commit()
 
     return result
 
@@ -257,32 +290,9 @@ def match_candidate_all(candidate_id: int, db: Session = Depends(get_db)):
 
     results = []
     for j in jobs:
-        job = {
-            "id": j.id,
-            "title": j.title,
-            "company": j.company,
-            "location": j.location,
-            "required_skills": j.required_skills,
-            "preferred_skills": j.preferred_skills,
-            "minimum_years_experience": j.minimum_years_experience,
-            "education_requirements": j.education_requirements,
-            "language_requirements": j.language_requirements,
-            "employment_percentage_min": None,
-            "employment_percentage_max": None,
-            "salary_min": j.salary_min,
-            "salary_max": j.salary_max,
-            "remote_percentage": getattr(j, 'remote_percentage', 0),
-            "department": getattr(j, 'department', None),
-            "company_values": getattr(j, 'company_values', None),
-            "personality_preferences": getattr(j, 'personality_preferences', None),
-        }
+        job = _job_dict(j)
         r = score_candidate_job(candidate, job)
         results.append(r)
-        # store log for each
-        log = MatchingLog(candidate_id=c.id, job_id=j.id, execution_time_ms=r.get('execution_time_ms'), algorithm_version=r.get('algorithm_version'))
-        db.add(log)
-    db.commit()
-    # sort by overall_score desc
     results.sort(key=lambda x: x.get('overall_score', 0), reverse=True)
     return results
 
@@ -293,33 +303,12 @@ def match_job_all(job_id: int, db: Session = Depends(get_db)):
     if not j:
         raise HTTPException(status_code=404, detail="Job not found")
     candidates = db.query(models.Candidate).all()
-    job = {
-        "id": j.id,
-        "title": j.title,
-        "company": j.company,
-        "location": j.location,
-        "required_skills": j.required_skills,
-        "preferred_skills": j.preferred_skills,
-        "minimum_years_experience": j.minimum_years_experience,
-        "education_requirements": j.education_requirements,
-        "language_requirements": j.language_requirements,
-        "employment_percentage_min": None,
-        "employment_percentage_max": None,
-        "salary_min": j.salary_min,
-        "salary_max": j.salary_max,
-        "remote_percentage": getattr(j, 'remote_percentage', 0),
-        "department": getattr(j, 'department', None),
-        "company_values": getattr(j, 'company_values', None),
-        "personality_preferences": getattr(j, 'personality_preferences', None),
-    }
+    job = _job_dict(j)
     results = []
     for c in candidates:
         candidate = _candidate_dict(c)
         r = score_candidate_job(candidate, job)
         results.append(r)
-        log = MatchingLog(candidate_id=c.id, job_id=j.id, execution_time_ms=r.get('execution_time_ms'), algorithm_version=r.get('algorithm_version'))
-        db.add(log)
-    db.commit()
     results.sort(key=lambda x: x.get('overall_score', 0), reverse=True)
     return results
 

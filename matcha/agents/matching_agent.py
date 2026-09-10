@@ -29,6 +29,22 @@ from preferences import (
 )
 import telemetry
 
+# Language names that can appear in a mandatory requirement. All of the named
+# languages must be present in the candidate's profile, not just the first one.
+MANDATORY_LANGUAGE_KEYWORDS = (
+    "german",
+    "french",
+    "english",
+    "italian",
+    "spanish",
+    "portuguese",
+    "dutch",
+    "russian",
+    "mandarin",
+    "arabic",
+    "turkish",
+)
+
 
 class MatchingAgent:
     """
@@ -165,15 +181,23 @@ class MatchingAgent:
                     else:
                         return False
 
-            elif "german" in req_lower or "french" in req_lower or "english" in req_lower:
-                language_found = False
-                for lang in profile.get("languages", []):
-                    if isinstance(lang, dict):
-                        lang_name = lang.get("language", "").lower()
-                        if req_lower.split()[0] in lang_name:
-                            language_found = True
-                            break
-                if not language_found:
+            elif any(lang in req_lower for lang in MANDATORY_LANGUAGE_KEYWORDS):
+                # A requirement may mention several languages, e.g. "German
+                # and English fluent". Extract every language keyword named in
+                # the requirement and require each one in the profile.
+                required_langs = [
+                    keyword for keyword in MANDATORY_LANGUAGE_KEYWORDS
+                    if re.search(rf"\b{keyword}\b", req_lower)
+                ]
+                profile_langs = {
+                    (lang.get("language", "").lower() if isinstance(lang, dict) else str(lang).lower())
+                    for lang in profile.get("languages", [])
+                }
+                missing = [
+                    keyword for keyword in required_langs
+                    if not any(keyword == name or keyword in name for name in profile_langs)
+                ]
+                if missing:
                     return False
 
             else:

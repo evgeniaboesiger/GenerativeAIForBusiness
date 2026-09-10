@@ -181,6 +181,8 @@ class ProfileAgent:
                 return "advanced"
         return None
 
+    DEGREE_WORDS = ("bsc", "bachelor", "msc", "master", "mba", "phd", "diploma", "certificate")
+
     def _extract_work_experience(self, text: str) -> List[WorkExperience]:
         entries: List[WorkExperience] = []
         for line in text.splitlines():
@@ -188,7 +190,7 @@ class ProfileAgent:
             if not stripped:
                 continue
             match = re.search(
-                r"(?P<start>\d{4})(?:\s*(?:-|–|to)\s*(?P<end>\d{4}|present|current))?\s+(?P<title>[^,]+?)(?:,\s*(?P<company>[^,]+?))(?:,\s*(?P<location>.*))?$",
+                r"(?P<start>\d{4})(?:\s*(?:-|–|to)\s*(?P<end>\d{4}|present|current|ongoing))?\s+(?P<title>[^,]+?)(?:,\s*(?P<company>[^,]+?))(?:,\s*(?P<location>.*))?$",
                 stripped,
                 flags=re.IGNORECASE,
             )
@@ -197,12 +199,20 @@ class ProfileAgent:
                 company = match.group("company").strip() if match.group("company") else None
                 location = match.group("location").strip() if match.group("location") else None
                 start_date = match.group("start")
+                end_raw = match.group("end")
+                if end_raw and end_raw.lower() in ("current", "ongoing"):
+                    end_raw = "present"
+                # An education line such as "2016 BSc Computer Science, ETH
+                # Zurich" is not a job: skip it so it never pollutes either the
+                # work history or the computed years of experience.
+                if title.lower().startswith(self.DEGREE_WORDS):
+                    continue
                 entries.append(
                     WorkExperience(
                         company=company,
                         title=title,
                         start_date=start_date,
-                        end_date=None,
+                        end_date=end_raw,
                         description=location,
                         status="extracted",
                         provenance=Provenance(source="cv", confidence=0.8, status="unverified"),
@@ -341,13 +351,21 @@ class ProfileAgent:
             return None
         total = 0
         for item in work_experience:
-            if item.start_date and item.end_date:
-                try:
-                    start = int(item.start_date[:4])
+            if not item.start_date:
+                continue
+            try:
+                start = int(item.start_date[:4])
+                if item.end_date and item.end_date.lower() in ("present", "now"):
+                    end = date.today().year
+                elif item.end_date:
                     end = int(item.end_date[:4])
-                    total += max(end - start, 0)
-                except ValueError:
+                else:
+                    # No end date captured and no explicit "present": be
+                    # conservative and count nothing rather than inventing years.
                     continue
+            except (ValueError, TypeError):
+                continue
+            total += max(end - start, 0)
         return total or None
 
     def _detect_duplicate_skills(self, text: str) -> List[str]:

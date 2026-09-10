@@ -1,7 +1,14 @@
+import tempfile
+from pathlib import Path
+
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from app.db.models import Candidate, Job
 from app.db.session import SessionLocal
 from app.matching.engine import score_candidate_job
+from app.core.config import settings
 from scripts.seed_demo_data import seed
 
 
@@ -100,17 +107,25 @@ def test_missing_mandatory_skill_and_education_block_recommendation():
     assert any("Education requirement not met" in gap for gap in result["gaps"])
 
 
-def test_seed_population_is_structurally_valid():
+def test_seed_population_is_structurally_valid(tmp_path, monkeypatch):
+    # Seed into a throwaway SQLite database so the committed demo database in
+    # the repo is never wiped by the tests.
+    tmp_db = tmp_path / "seed_test.db"
+    monkeypatch.setattr(settings, "database_url", f"sqlite:///{tmp_db}")
+
     stats = seed()
     assert stats == {"candidates": 100, "jobs": 50}
 
-    db = SessionLocal()
+    engine = create_engine(settings.database_url, future=True)
+    TestSession = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    db = TestSession()
     try:
         assert db.query(Candidate).count() == 100
         assert db.query(Job).count() == 50
         assert db.query(Candidate).filter(Candidate.email == "demo0@example.local").count() == 1
     finally:
         db.close()
+        engine.dispose()
 
 
 def test_step3_demo_scenarios():
@@ -451,3 +466,60 @@ def test_negated_weekend_phrasing_is_not_a_dealbreaker():
     assert job_has_weekend_work(job) is False
     res = score_candidate_job(make_tiered_candidate(), job)
     assert res["hard_constraints_met"] is True
+
+
+# --- Regression tests: Job 1 bug fixes ------------------------------------ #
+
+def test_job_without_employment_data_is_neutral_not_a_dealbreaker():
+    # A job that leaves its workload unspecified must not be treated as 100%
+    # (that would wrongly hard-block part-time candidates from jobs that just
+    # never declared their employment level).
+    candidate = make_candidate(["Python"], employment_min=50, employment_max=80,
+                               languages=[{"language": "German", "level": "C1"}])
+    job = make_job(["Python"])
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+    assert res["component_scores"]["employment"] == 100.0
+    assert not any("workload" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_remote_job_commute_is_waived():
+    # A fully remote role has no commute, so the scalar commute deal-breaker
+    # must not fire just because the location hash yields a far distance.
+    candidate = make_candidate(["Python"], location="Zurich",
+                               languages=[{"language": "German", "level": "C1"}])
+    candidate["maximum_commute_minutes"] = 30
+    job = make_job(["Python"], location="Bern")
+    job["remote_percentage"] = 100
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+    assert not any("commute" in v.lower() for v in res["hard_constraint_violations"])
+
+
+def test_employment_tier_supersedes_scalar_workload_constraint():
+    # Candidate expresses an employment tier (ideally ~80%) while the job is
+    # 100%. The tier layer must supersede the scalar 50–100 workload check.
+    candidate = make_candidate(["Python"], employment_min=50, employment_max=100,
+                               languages=[{"language": "German", "level": "C1"}])
+    candidate["preference_tiers"] = {
+        "employment_percentage": {"ideal": [70, 90], "acceptable": [60, 100], "deal_breaker": [50, 100]},
+    }
+    job = make_job(["Python"])
+    job["employment_percentage"] = 100
+    res = score_candidate_job(candidate, job)
+    assert res["hard_constraints_met"] is True
+    tr = res["preference_tiers"]["dimensions"]["employment_percentage"]
+    assert tr["deal_breaker"] is False
+
+
+def test_malformed_skill_entries_do_not_crash_scoring():
+    # Skills that arrive as None or a bare string must not crash the matcher,
+    # and malformed entries must not drag the score down.
+    candidate = make_candidate(["Python"], years=5,
+                               languages=[{"language": "German", "level": "C1"}])
+    candidate["skills"] = [{"skill": "Python"}, None, "SQL", {"other": "x"}, {"skill": None}]
+    job = make_job(["Python"], preferred_skills=["SQL"])
+    job["required_skills"] = [{"skill": "Python", "mandatory": True}, None, {"skill": None, "mandatory": True}]
+    res = score_candidate_job(candidate, job)
+    assert res["mandatory_requirements_met"] is True
+    assert res["component_scores"]["skills"] == 100.0

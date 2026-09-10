@@ -368,6 +368,10 @@ def _step_salary():
                 "Wenn Ihnen das Niveau nicht wichtig ist, wählen Sie 'Flexible'."),
     )
     _set_value("preferred_employment_target", _pct_from_label(target))
+    # Picking "Flexible" as the target means the candidate is open to any
+    # employment level. Record that explicitly so the employment bucket gives
+    # full compatibility (1.0) instead of a neutral 0.5.
+    _set_value("employment_flexible", _pct_from_label(target) is None)
 
     col_min, col_max = st.columns(2)
     with col_min:
