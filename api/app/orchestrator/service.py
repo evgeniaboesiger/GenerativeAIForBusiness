@@ -3,6 +3,7 @@ import time
 import threading
 from datetime import datetime
 from typing import Dict, Any, List
+from sqlalchemy.orm import selectinload
 from app.db import session as db_session
 from app.db import models
 from app.orchestrator import schemas
@@ -81,16 +82,25 @@ class Orchestrator:
         agent = "JobMatchingAgent"
         start = _now()
         try:
-            # load candidate and job
+            # load candidate and job (relationships eager so the session can close)
             db = db_session.SessionLocal()
-            c = db.query(models.Candidate).filter(models.Candidate.id == candidate_id).first()
+            c = (
+                db.query(models.Candidate)
+                .options(
+                    selectinload(models.Candidate.experiences),
+                    selectinload(models.Candidate.skills),
+                    selectinload(models.Candidate.education),
+                )
+                .filter(models.Candidate.id == candidate_id)
+                .first()
+            )
             j = db.query(models.Job).filter(models.Job.id == job_id).first()
             db.close()
             candidate = {
                 "id": c.id,
                 "name": c.name,
                 "location": c.location,
-                "years_experience": sum([((e.end_date.year if e.end_date else 2026) - (e.start_date.year if e.start_date else 0)) for e in c.experiences]) if c.experiences else 0,
+                "years_experience": c.years_experience or 0,
                 "skills": [{"skill": s.skill, "level": s.level} for s in c.skills],
                 "education": [{"degree": e.degree, "field": e.field} for e in c.education],
                 "languages": [],

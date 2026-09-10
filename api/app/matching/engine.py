@@ -199,8 +199,8 @@ def compute_location_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> fl
 
 
 def compute_employment_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
-    cmin = candidate.get("employment_percentage_min", 50)
-    cmax = candidate.get("employment_percentage_max", 100)
+    cmin = candidate.get("employment_percentage_min") or 50
+    cmax = candidate.get("employment_percentage_max") or 100
     job_range = job_employment_range(job)
     if job_range is None:
         # no employment data on the job -> unknown, treat as fully flexible (neutral)
@@ -222,8 +222,8 @@ def compute_employment_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> 
 
 
 def compute_salary_score(candidate: Dict[str, Any], job: Dict[str, Any]) -> float:
-    cmin = candidate.get("salary_expectation_min", 0)
-    cmax = candidate.get("salary_expectation_max", 9999999)
+    cmin = candidate.get("salary_expectation_min") or 0
+    cmax = candidate.get("salary_expectation_max") or 9999999
     jmin = job.get("salary_min") or 0
     jmax = job.get("salary_max") or 9999999
 
