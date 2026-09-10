@@ -99,6 +99,20 @@ def main():
     """Main application entry point."""
     init_session()
 
+    st.markdown(
+        """
+        <style>
+        [data-testid="stHeaderActionElements"] a[aria-label="Link to heading"] {
+            display: none !important;
+        }
+        [data-testid="stHeadingWithActionElements"] a {
+            display: none !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     # Honour a pending navigation request from the Dashboard shortcuts.
     # Must happen before the sidebar radio widget is instantiated.
     pending_page = st.session_state.pop("_open_page", None)
@@ -107,8 +121,8 @@ def main():
 
     # Sidebar - navigation
     st.sidebar.title("🤝 MATCHA")
-    st.sidebar.markdown(tr("*Smart Job Matching for Women in Switzerland*",
-                           "*Smartes Job-Matching für Frauen in der Schweiz*"))
+    st.sidebar.markdown(tr("*More than a match. A better fit.*",
+                           "*Mehr als ein Match. Eine bessere Passung.*"))
     lang = st.sidebar.radio(
         tr("Language", "Sprache"),
         list(SUPPORTED_LANGUAGES),
@@ -230,13 +244,11 @@ def show_auth_page():
             reg_password = st.text_input(
                 tr("Password (min. 6 characters)", "Passwort (mind. 6 Zeichen)"), type="password", key="reg_password"
             )
-            role = st.selectbox(tr("I am a...", "Ich bin..."), [tr("Candidate (job seeker)", "Kandidatin (Jobsuchende)"), tr("Recruiter", "Recruiter:in")])
 
             submitted_reg = st.form_submit_button(tr("Create account", "Konto erstellen"), type="primary", use_container_width=True)
             if submitted_reg:
-                role_value = "candidate" if role.startswith(("Candidate", "Kandidatin")) else "recruiter"
                 try:
-                    user = register_user(reg_email, reg_password, full_name, role=role_value)
+                    user = register_user(reg_email, reg_password, full_name)
                     st.session_state.user = user
                     st.success(tr("Welcome, {}! Your account was created and you are now logged in.",
                                   "Willkommen, {}! Ihr Konto wurde erstellt und Sie sind jetzt angemeldet.").format(user['full_name']))
@@ -319,12 +331,7 @@ def show_account_page():
                 st.session_state.editing_name = True
                 st.rerun()
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.text_input(tr("Email", "E-Mail"), value=user["email"], disabled=True)
-    with col2:
-        role_label = tr("Candidate", "Kandidatin") if user['role'] == 'candidate' else tr("Recruiter", "Recruiter:in")
-        st.text_input(tr("Role", "Rolle"), value=role_label, disabled=True)
+    st.text_input(tr("Email", "E-Mail"), value=user["email"], disabled=True)
 
     st.markdown("---")
 
@@ -454,24 +461,22 @@ def show_dashboard():
     # Project overview
     st.subheader(tr("🎯 What is MATCHA?", "🎯 Was ist MATCHA?"))
     st.markdown(tr("""
-    MATCHA is a **Swiss employment-matching platform** designed to:
+    MATCHA is a Swiss **AI-powered job-matching platform** that helps candidates find roles that fit their skills, goals, preferences, and individual situation.
 
-    - **Help women job seekers** identify suitable job opportunities faster
-    - **Help recruiters** identify relevant candidates with less manual screening
-    - **Reduce screening effort** while improving transparency and consistency
+    - Find **better-fit jobs** based on professional, practical, and work-environment fit
+    - Understand your match with transparent strengths, gaps, and deal-breakers
+    - Save time applying with tailored CV and cover-letter support
 
-    MATCHA does **NOT** replace recruiters or make automated hiring decisions. 
-    It assists human decision-making with AI-powered tools.
+    **More than a match. A better fit.**
     """,
     """
-    MATCHA ist eine **Schweizer Job-Matching-Plattform** mit dem Ziel:
+    MATCHA ist eine Schweizer **KI-gestützte Job-Matching-Plattform**, die Kandidatinnen und Kandidaten dabei hilft, Stellen zu finden, die zu ihren Fähigkeiten, Zielen, Präferenzen und ihrer individuellen Situation passen.
 
-    - **Arbeitssuchenden Frauen** schneller geeignete Stellenangebote zu finden
-    - **Recruiter:innen** relevante Kandidatinnen mit weniger manuellem Screening zu identifizieren
-    - **Screening-Aufwand zu reduzieren** bei mehr Transparenz und Konsistenz
+    - Finden Sie **besser passende Jobs** auf Basis von fachlicher, praktischer und Arbeitsumfeld-Passung
+    - Verstehen Sie Ihren Match dank transparenter Stärken, Lücken und Deal-Breakern
+    - Sparen Sie Zeit bei der Bewerbung dank massgeschneiderter CV- und Anschreiben-Unterstützung
 
-    MATCHA **ersetzt keine** Recruiter:innen und trifft keine automatisierten
-    Einstellungsentscheidungen. Es unterstützt menschliche Entscheidungen mit KI-gestützten Tools.
+    **Mehr als ein Match. Eine bessere Passung.**
     """))
 
     st.markdown("---")
