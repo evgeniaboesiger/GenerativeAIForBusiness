@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { PERSONALITY_DIMENSIONS } from '../../../lib/assessment';
 
 type ReviewStatus = 'extracted' | 'needs_review' | 'candidate_confirmed';
@@ -246,9 +247,9 @@ export default function CandidateProfilePage() {
         <section className="rounded-xl border bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold">Personality &amp; Values</h2>
-            <a href="/candidate/assessment" className="text-sm text-accent hover:underline">
+            <Link href="/candidate/assessment" className="text-sm text-accent hover:underline">
               Take / update assessment
-            </a>
+            </Link>
           </div>
           <p className="text-sm text-slate-500 mb-4">
             Optional self-assessment. Your results are informational only and are never used to rank or filter job offers.

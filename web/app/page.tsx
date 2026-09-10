@@ -1,13 +1,15 @@
+import Link from 'next/link'
+
 export default function Home() {
   return (
     <section>
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-navy">FRAUMATCH</h1>
-          <p className="mt-2 text-muted-foreground max-w-xl">A Swiss-focused employment matching platform for women — university proof of concept.</p>
+          <p className="mt-2 text-gray-500 max-w-xl">A Swiss-focused employment matching platform for women — university proof of concept.</p>
         </div>
         <div>
-          <a href="/role-select" className="px-4 py-2 bg-accent text-white rounded-lg">Get started</a>
+          <Link href="/role-select" className="px-4 py-2 bg-accent text-white rounded-lg">Get started</Link>
         </div>
       </div>
 

@@ -22,51 +22,53 @@ PERSONALITY_DIMENSIONS = [
 # 40 personality questions: 10 per dimension.
 # Each question maps to a dimension; the response scale is 1..7 where the
 # left-anchor of the scale corresponds to the "left" pole and the right
-# anchor corresponds to the "right" pole.
+# anchor corresponds to the "right" pole. Questions whose statement expresses
+# the LEFT pole are marked reverse=True so agreement is mapped to the left
+# side of the scale (8 - answer) before averaging.
 PERSONALITY_QUESTIONS = [
     # --- Mind (10) ---
     {"id": "mind_1", "dimension": "mind", "text": "You find it easy to introduce yourself to other people."},
-    {"id": "mind_2", "dimension": "mind", "text": "You often prefer to spend time with a small group of close friends rather than a large group."},
-    {"id": "mind_3", "dimension": "mind", "text": "You tend to be quiet and reserved in unfamiliar situations."},
+    {"id": "mind_2", "dimension": "mind", "text": "You often prefer to spend time with a small group of close friends rather than a large group.", "reverse": True},
+    {"id": "mind_3", "dimension": "mind", "text": "You tend to be quiet and reserved in unfamiliar situations.", "reverse": True},
     {"id": "mind_4", "dimension": "mind", "text": "After a busy day, you recharge best by being around other people."},
     {"id": "mind_5", "dimension": "mind", "text": "You usually think out loud and talk through ideas with others."},
-    {"id": "mind_6", "dimension": "mind", "text": "You prefer to work independently rather than in a lively group setting."},
+    {"id": "mind_6", "dimension": "mind", "text": "You prefer to work independently rather than in a lively group setting.", "reverse": True},
     {"id": "mind_7", "dimension": "mind", "text": "You feel energized by social events and networking."},
-    {"id": "mind_8", "dimension": "mind", "text": "You often need quiet time alone to think clearly."},
+    {"id": "mind_8", "dimension": "mind", "text": "You often need quiet time alone to think clearly.", "reverse": True},
     {"id": "mind_9", "dimension": "mind", "text": "You are comfortable being the center of attention."},
-    {"id": "mind_10", "dimension": "mind", "text": "You would rather observe a conversation than lead it."},
+    {"id": "mind_10", "dimension": "mind", "text": "You would rather observe a conversation than lead it.", "reverse": True},
     # --- Energy (10) ---
-    {"id": "energy_1", "dimension": "energy", "text": "You rely more on your experience than on your imagination when making decisions."},
+    {"id": "energy_1", "dimension": "energy", "text": "You rely more on your experience than on your imagination when making decisions.", "reverse": True},
     {"id": "energy_2", "dimension": "energy", "text": "You enjoy thinking about possibilities and what could be, not just what is."},
-    {"id": "energy_3", "dimension": "energy", "text": "You focus on concrete facts and details rather than abstract theories."},
+    {"id": "energy_3", "dimension": "energy", "text": "You focus on concrete facts and details rather than abstract theories.", "reverse": True},
     {"id": "energy_4", "dimension": "energy", "text": "You find it easy to think of new ways to do things."},
-    {"id": "energy_5", "dimension": "energy", "text": "You prefer sticking to proven methods over experimenting."},
+    {"id": "energy_5", "dimension": "energy", "text": "You prefer sticking to proven methods over experimenting.", "reverse": True},
     {"id": "energy_6", "dimension": "energy", "text": "You often notice patterns and connections that others miss."},
-    {"id": "energy_7", "dimension": "energy", "text": "You are more practical than visionary."},
+    {"id": "energy_7", "dimension": "energy", "text": "You are more practical than visionary.", "reverse": True},
     {"id": "energy_8", "dimension": "energy", "text": "You are drawn to big-picture thinking and future trends."},
-    {"id": "energy_9", "dimension": "energy", "text": "You trust established routines and procedures."},
+    {"id": "energy_9", "dimension": "energy", "text": "You trust established routines and procedures.", "reverse": True},
     {"id": "energy_10", "dimension": "energy", "text": "You enjoy brainstorming speculative ideas, even if they are not realistic."},
     # --- Nature (10) ---
-    {"id": "nature_1", "dimension": "nature", "text": "You base your decisions more on logic than on how they affect people."},
+    {"id": "nature_1", "dimension": "nature", "text": "You base your decisions more on logic than on how they affect people.", "reverse": True},
     {"id": "nature_2", "dimension": "nature", "text": "You find it important to acknowledge other people's feelings."},
-    {"id": "nature_3", "dimension": "nature", "text": "You would rather point out the truth than spare someone's feelings."},
+    {"id": "nature_3", "dimension": "nature", "text": "You would rather point out the truth than spare someone's feelings.", "reverse": True},
     {"id": "nature_4", "dimension": "nature", "text": "You value harmony in a team over being objectively right."},
-    {"id": "nature_5", "dimension": "nature", "text": "You tend to make decisions with your head rather than your heart."},
+    {"id": "nature_5", "dimension": "nature", "text": "You tend to make decisions with your head rather than your heart.", "reverse": True},
     {"id": "nature_6", "dimension": "nature", "text": "You are quick to praise the efforts of others."},
-    {"id": "nature_7", "dimension": "nature", "text": "You find it easy to separate personal feelings from professional decisions."},
+    {"id": "nature_7", "dimension": "nature", "text": "You find it easy to separate personal feelings from professional decisions.", "reverse": True},
     {"id": "nature_8", "dimension": "nature", "text": "You are moved by other people's stories and struggles."},
-    {"id": "nature_9", "dimension": "nature", "text": "You prefer direct, honest feedback even when it is harsh."},
+    {"id": "nature_9", "dimension": "nature", "text": "You prefer direct, honest feedback even when it is harsh.", "reverse": True},
     {"id": "nature_10", "dimension": "nature", "text": "You consider team morale as important as results."},
     # --- Tactics (10) ---
-    {"id": "tactics_1", "dimension": "tactics", "text": "You like to have a clear plan before starting a project."},
+    {"id": "tactics_1", "dimension": "tactics", "text": "You like to have a clear plan before starting a project.", "reverse": True},
     {"id": "tactics_2", "dimension": "tactics", "text": "You are comfortable with last-minute changes to your schedule."},
-    {"id": "tactics_3", "dimension": "tactics", "text": "You tend to finish tasks well ahead of their deadlines."},
+    {"id": "tactics_3", "dimension": "tactics", "text": "You tend to finish tasks well ahead of their deadlines.", "reverse": True},
     {"id": "tactics_4", "dimension": "tactics", "text": "You enjoy improvising rather than following a strict schedule."},
-    {"id": "tactics_5", "dimension": "tactics", "text": "You prefer your day to be structured and organized."},
+    {"id": "tactics_5", "dimension": "tactics", "text": "You prefer your day to be structured and organized.", "reverse": True},
     {"id": "tactics_6", "dimension": "tactics", "text": "You are open to changing your plans at the last minute."},
-    {"id": "tactics_7", "dimension": "tactics", "text": "You create to-do lists and like to tick items off."},
+    {"id": "tactics_7", "dimension": "tactics", "text": "You create to-do lists and like to tick items off.", "reverse": True},
     {"id": "tactics_8", "dimension": "tactics", "text": "You like to keep your options open rather than commit early."},
-    {"id": "tactics_9", "dimension": "tactics", "text": "You find it stressful when plans keep changing."},
+    {"id": "tactics_9", "dimension": "tactics", "text": "You find it stressful when plans keep changing.", "reverse": True},
     {"id": "tactics_10", "dimension": "tactics", "text": "You work best with freedom and flexibility rather than rigid rules."},
 ]
 
@@ -175,6 +177,10 @@ def compute_personality_profile(responses):
         answer = responses.get(q["id"])
         if answer is None:
             continue
+        # Reverse-keyed items express the LEFT pole: agreement maps to the
+        # left side of the scale (1..7 => 7..1).
+        if q.get("reverse"):
+            answer = 8 - answer
         dims.setdefault(q["dimension"], []).append(float(answer))
 
     profile = {}

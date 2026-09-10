@@ -12,7 +12,7 @@ from sqlalchemy import (
     JSON as JSONType,
 )
 from sqlalchemy.orm import relationship, declarative_base
-from datetime import datetime
+from datetime import datetime, date
 
 Base = declarative_base()
 
@@ -36,6 +36,22 @@ class Candidate(Base):
     experiences = relationship('Experience', back_populates='candidate', cascade='all, delete')
     skills = relationship('Skill', back_populates='candidate', cascade='all, delete')
     education = relationship('Education', back_populates='candidate', cascade='all, delete')
+
+    @property
+    def years_experience(self) -> int:
+        """Total full years of recorded experience.
+
+        Ongoing entries (no end_date) count up to today so the number never
+        goes stale with a hard-coded year.
+        """
+        total = 0
+        for e in self.experiences or []:
+            if not e.start_date:
+                continue
+            end = e.end_date or date.today()
+            if end >= e.start_date:
+                total += end.year - e.start_date.year
+        return total
 
 
 class ProfileExtraction(Base):

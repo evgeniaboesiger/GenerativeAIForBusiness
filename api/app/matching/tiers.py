@@ -55,15 +55,23 @@ def commute_minutes(candidate_loc: str, job_loc: str) -> int:
     return 120
 
 
-def job_employment_range(job: Dict[str, Any]) -> Tuple[int, int]:
-    """Resolve the job's employment percentage as a (min, max) range."""
+def job_employment_range(job: Dict[str, Any]) -> Optional[Tuple[int, int]]:
+    """Resolve the job's employment percentage as a (min, max) range.
+
+    Returns ``None`` when the job carries no employment data: the caller then
+    treats the dimension as unknown/neutral instead of assuming full-time,
+    which would wrongly hard-block part-time candidates from jobs that just
+    did not specify their workload.
+    """
     jmin = job.get("employment_percentage_min")
     jmax = job.get("employment_percentage_max")
     single = job.get("employment_percentage")
     if jmin is None:
-        jmin = single if single is not None else 100
+        jmin = single
     if jmax is None:
-        jmax = single if single is not None else 100
+        jmax = single
+    if jmin is None or jmax is None:
+        return None
     return jmin, jmax
 
 
@@ -207,7 +215,11 @@ def has_tiers(candidate: Dict[str, Any]) -> bool:
 def evaluate_employment(tiers: Dict[str, Any], candidate: Dict[str, Any],
                         job: Dict[str, Any]) -> Tuple[bool, float, str]:
     tr = tiers["employment_percentage"]
-    jmin, jmax = job_employment_range(job)
+    job_range = job_employment_range(job)
+    if job_range is None:
+        # No workload info on the job -> unknown, never a deal-breaker.
+        return True, 100.0, "No workload information to compare against"
+    jmin, jmax = job_range
     if jmin >= tr["ideal"][0] and jmax <= tr["ideal"][1]:
         return True, 100.0, f"Workload {jmin}–{jmax}% matches your ideal range"
     if jmin >= tr["acceptable"][0] and jmax <= tr["acceptable"][1]:
@@ -237,6 +249,10 @@ def evaluate_salary(tiers: Dict[str, Any], candidate: Dict[str, Any],
 
 def evaluate_commute(tiers: Dict[str, Any], candidate: Dict[str, Any],
                      job: Dict[str, Any]) -> Tuple[bool, float, str]:
+    # A fully remote role has no meaningful commute, so it always satisfies the
+    # candidate's commute tiers instead of being penalised by the location hash.
+    if job_remote_level(job) == "remote":
+        return True, 100.0, f"{job_remote_level(job).title()} role — no commute needed"
     minutes = commute_minutes(candidate.get("location"), job.get("location"))
     ideal = tiers["commute"]["ideal_max_minutes"]
     acceptable = tiers["commute"]["acceptable_max_minutes"]

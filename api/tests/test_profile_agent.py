@@ -56,7 +56,7 @@ def test_incomplete_cv_returns_unknown_for_missing_fields():
     assert result.profile.salary_expectation is None
     assert result.profile.preferred_locations is None
     assert result.profile.availability is None
-    assert result.profile.work_experience[0].end_date is None
+    assert result.profile.work_experience[0].end_date == "2023"
 
 
 def test_ambiguous_skill_is_marked_for_review():

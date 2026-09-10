@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   PERSONALITY_DIMENSIONS,
   PERSONALITY_QUESTIONS,
@@ -279,9 +280,9 @@ export default function AssessmentPage() {
             <button onClick={() => setStep('values')} className="px-5 py-2 border rounded-lg text-slate-600">
               ← Edit answers
             </button>
-            <a href="/candidate/dashboard" className="px-5 py-2 bg-accent text-white rounded-lg">
+            <Link href="/candidate/dashboard" className="px-5 py-2 bg-accent text-white rounded-lg">
               Go to dashboard
-            </a>
+            </Link>
           </div>
         </div>
       ) : null}
