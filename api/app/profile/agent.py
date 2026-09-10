@@ -308,12 +308,9 @@ class ProfileAgent:
         return cleaned or None
 
     def _extract_remote_preference(self, text: str) -> Optional[str]:
-        if re.search(r"\bremote\s*[:\-]?\s*yes\b|\bremote\s*:\s*" , text, flags=re.IGNORECASE):
-            return "yes"
-        if re.search(r"\bremote\s*[:\-]?\s*no\b", text, flags=re.IGNORECASE):
-            return "no"
-        if re.search(r"\bremote\s*[:\-]?\s*hybrid\b", text, flags=re.IGNORECASE):
-            return "hybrid"
+        match = re.search(r"\bremote\s*[:\-]?\s*(yes|no|hybrid)\b", text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).lower()
         return None
 
     def _extract_salary_expectation(self, text: str) -> Optional[Dict[str, Any]]:

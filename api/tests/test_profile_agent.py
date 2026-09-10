@@ -136,3 +136,56 @@ def test_hallucination_prevention_for_missing_salary_and_remote_preferences():
     assert result.profile.remote_preference is None
     assert result.profile.preferred_locations is None
     assert result.audit.fields_needing_review >= 0
+
+
+def test_edge_cv_parsing_fallbacks():
+    cv = """
+    Edge Candidate — Python expert and SQL queries specialist.
+    Experience
+    2016 BSc Computer Science, ETH Zurich
+    2019 Senior Developer, Legacy Co, Zurich
+    - Led a team of five
+    2021-2024 Team Lead, ScaleUp GmbH, Bern
+    Education
+    2016 BSc Computer Science, ETH Zurich
+    Languages: German B2
+    Preferred employment: 80%
+    Remote: hybrid
+    Salary expectation: CHF 95,000
+    Availability: from 2026-03-01
+    """
+
+    result = agent.extract_profile(cv)
+
+    assert result.profile.remote_preference == "hybrid"
+    assert result.profile.preferred_employment_percentage == 80
+    assert result.profile.salary_expectation == {"min": 95000, "max": 95000, "currency": "CHF"}
+    assert result.profile.availability == "2026-03-01"
+    # degree lines inside Experience are ignored: only real roles count
+    assert all(e.title != "BSc Computer Science" for e in result.profile.work_experience)
+
+
+def test_remote_preference_no():
+    result = agent.extract_profile("Remote: no. Skills: Python.")
+    assert result.profile.remote_preference == "no"
+
+
+def test_percentage_fallbacks_and_certificates():
+    cv = """
+    I can work at 80%FTE and I am certified: AWS Solutions Architect.
+    Experience
+    2016-2020 Data Engineer, Nova Analytics, Basel
+    """
+
+    result = agent.extract_profile(cv)
+
+    assert result.profile.preferred_employment_percentage == 80
+    assert any("AWS Solutions Architect" in c for c in result.profile.certificates)
+
+
+def test_out_of_range_employment_percentage_not_extracted():
+    cv = "Preferred employment: 150%. Skills: Python."
+
+    result = agent.extract_profile(cv)
+
+    assert result.profile.preferred_employment_percentage is None

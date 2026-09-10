@@ -564,3 +564,19 @@ def test_workflow_get_returns_agent_history():
         assert history[0]["estimated_cost"] == 0.0
     finally:
         _cleanup(workflow_ids=[wid])
+def test_years_experience_skips_experience_without_start_date():
+    db = SessionLocal()
+    try:
+        c = Candidate(name="yearless", email="yearless@example.com")
+        db.add(c); db.flush()
+        db.add(Experience(candidate_id=c.id, job_title="Dev", company="X",
+                           start_date=None, end_date=None))
+        db.commit()
+        c = db.get(Candidate, c.id)
+        assert c.years_experience == 0
+    finally:
+        db.rollback()
+        db.query(Experience).filter_by(company="X").delete(synchronize_session=False)
+        db.query(Candidate).filter_by(email="yearless@example.com").delete(synchronize_session=False)
+        db.commit()
+        db.close()

@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.db.models import AgentLog, Candidate, Experience, Job, Workflow
 from app.db.session import SessionLocal
 from app.orchestrator import schemas
+from app.orchestrator import service as orchestrator_service
 from app.orchestrator.service import orchestrator
 
 
@@ -142,3 +143,96 @@ def test_workflow_logs_error_when_candidate_missing():
         assert logs[-1]["error"]
     finally:
         _cleanup(cid, jid, wf_id)
+
+
+# --- agent failure branches (each agent logs 'failed' and stops) ----------- #
+
+def _boom_on(n):
+    state = {"i": 0}
+
+    def _inner(*_args, **_kwargs):
+        state["i"] += 1
+        if state["i"] == n:
+            raise RuntimeError("boom")
+
+    return _inner
+
+
+def _wipe(wf_id):
+    db = SessionLocal()
+    try:
+        db.query(AgentLog).filter(AgentLog.workflow_id == wf_id).delete(synchronize_session=False)
+        db.query(Workflow).filter(Workflow.workflow_id == wf_id).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_profile_agent_logs_failure(monkeypatch):
+    wf_id = f"dddd0000-0000-0000-0000-00000000000{2}"
+    try:
+        monkeypatch.setattr(orchestrator_service.time, "sleep", _boom_on(1))
+        orchestrator._run_profile_and_match(wf_id, 1, 1)
+        logs = _agent_logs(wf_id)
+        assert [l["agent"] for l in logs] == ["ProfileAgent"]
+        assert logs[0]["status"] == "failed"
+        assert logs[0]["error"]
+    finally:
+        _wipe(wf_id)
+
+
+def test_assessment_agent_logs_failure(monkeypatch):
+    wf_id = f"eeee0000-0000-0000-0000-00000000000{3}"
+    try:
+        monkeypatch.setattr(orchestrator_service.time, "sleep", _boom_on(1))
+        orchestrator._run_assessment_and_followups(wf_id, 1, 1)
+        logs = _agent_logs(wf_id)
+        assert [l["agent"] for l in logs] == ["AssessmentAgent"]
+        assert logs[0]["status"] == "failed"
+    finally:
+        _wipe(wf_id)
+
+
+def test_qualification_agent_logs_failure(monkeypatch):
+    wf_id = f"ffff0000-0000-0000-0000-00000000000{4}"
+    try:
+        monkeypatch.setattr(orchestrator_service.time, "sleep", _boom_on(2))
+        orchestrator._run_assessment_and_followups(wf_id, 1, 1)
+        logs = _agent_logs(wf_id)
+        assert [l["agent"] for l in logs] == ["AssessmentAgent", "QualificationAgent"]
+        assert logs[-1]["status"] == "failed"
+    finally:
+        _wipe(wf_id)
+
+
+def test_application_agent_logs_failure(monkeypatch):
+    wf_id = f"aba20000-0000-0000-0000-00000000000{6}"
+    try:
+        monkeypatch.setattr(orchestrator_service.time, "sleep", _boom_on(3))
+        orchestrator._run_assessment_and_followups(wf_id, 1, 1)
+        logs = _agent_logs(wf_id)
+        assert [l["agent"] for l in logs] == [
+            "AssessmentAgent",
+            "QualificationAgent",
+            "ApplicationAgent",
+        ]
+        assert logs[-1]["status"] == "failed"
+    finally:
+        _wipe(wf_id)
+
+
+def test_recruiter_agent_logs_failure(monkeypatch):
+    wf_id = f"aca30000-0000-0000-0000-00000000000{7}"
+    try:
+        monkeypatch.setattr(orchestrator_service.time, "sleep", _boom_on(4))
+        orchestrator._run_assessment_and_followups(wf_id, 1, 1)
+        logs = _agent_logs(wf_id)
+        assert [l["agent"] for l in logs] == [
+            "AssessmentAgent",
+            "QualificationAgent",
+            "ApplicationAgent",
+            "RecruiterScreeningAgent",
+        ]
+        assert logs[-1]["status"] == "failed"
+    finally:
+        _wipe(wf_id)
