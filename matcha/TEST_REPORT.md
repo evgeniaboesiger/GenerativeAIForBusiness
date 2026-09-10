@@ -1,10 +1,10 @@
 # MATCHA — Whole-Program Test Report
 
-Date: 2026-09-09
+Date: 2026-09-10 (initial round 2026-09-09)
 Scope: the complete MATCHA Streamlit application in `matcha/` (12 pages/flows, EN + DE, fresh database).
 Method: the whole program was tested **twice** — once before fixing (baseline) and once more after the fixes — using three layers:
 
-1. **Unit/integration suite** — `python -m pytest tests/ -q`: **92 passed** at baseline, **101 passed** after fixes.
+1. **Unit/integration suite** — `python -m pytest tests/ -q`: **92 passed** at baseline, **101 passed** after fixes, **104 passed** as of the second test round (2026-09-10).
 2. **Three AppTest smoke scripts** (`smoke_i18n`, `smoke_account`, `smoke_job_carryover`): all pass.
 3. **Comprehensive end-to-end AppTest walkthrough** (`e2e_full.py`): **34 checks** covering every page in both languages on a fresh DB, plus cross-session persistence. All pass (run on baseline and again after fixes).
 
@@ -44,10 +44,28 @@ The e2e walkthrough exercises: auth (EN + DE), wrong-password rejection, duplica
 ---
 
 ## Final status
-- `python -m pytest tests/ -q` → **101 passed**
+- `python -m pytest tests/ -q` → **104 passed**
 - 3 smoke scripts → **passed**
 - e2e walkthrough (34 checks, EN + DE, fresh DB) → **passed**, run twice
 - Repository: fixes + regression tests + this report committed on `main` and pushed.
+
+## Second round (2026-09-10) — additional fixes
+
+### BUG 4 — MEDIUM: mandatory language check only required one of several languages
+- **Where:** `matcha/agents/matching_agent.py`
+- **What:** when a job requirement named several languages (e.g. "German and English"), the check only required **one** of them to be present in the CV, so candidates speaking just one were wrongly accepted.
+- **Fix:** `_check_mandatory_requirements` now extracts every language keyword from the requirement and requires each one (word-boundary matching via `MANDATORY_LANGUAGE_KEYWORDS`).
+- **Verification:** 3 new tests — multi-language mandatory requirement, single-language requirement, and flexible employment marking (`test_preferences.py`). Suite grew **101 → 104**.
+
+### BUG 5 — LOW: "Flexible" salary target left `employment_flexible` unset
+- **Where:** `matcha/preferences_ui.py` (`_step_salary`)
+- **What:** choosing a flexible salary target in the wizard did not set the `employment_flexible` preference, so downstream matching treated employment flexibility as unknown.
+- **Fix:** `_set_value("employment_flexible", _pct_from_label(target) is None)` when the chosen target is "Flexible".
+- **Verification:** covered by the new flexible-employment test (summary text + stored value).
+
+### Checked and confirmed still NOT bugs (second round)
+- Preference save/load round-trip only stores explicitly-set keys; defaults are applied on read (`load_preferences` returns a sparse dict). Not a defect.
+- Requirement checks and scores are deterministic across repeated `find_matches` runs (no hidden randomness).
 
 ## How to reproduce
 ```
