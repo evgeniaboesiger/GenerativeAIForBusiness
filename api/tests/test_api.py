@@ -3,11 +3,14 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 
+from app.db import session as db_session
 from app.db.models import (
     AgentLog,
     Candidate,
     Experience,
     Job,
+    Match,
+    MatchingLog,
     ProfileExtraction,
     ProfileReview,
     Workflow,
@@ -51,8 +54,16 @@ def _cleanup(ids=(), job_ids=(), workflow_ids=()):
                 synchronize_session=False
             )
         for jid in job_ids:
+            db.query(Match).filter(Match.job_id == jid).delete(synchronize_session=False)
+            db.query(MatchingLog).filter(MatchingLog.job_id == jid).delete(
+                synchronize_session=False
+            )
             db.query(Job).filter(Job.id == jid).delete(synchronize_session=False)
         for cid in ids:
+            db.query(Match).filter(Match.candidate_id == cid).delete(synchronize_session=False)
+            db.query(MatchingLog).filter(MatchingLog.candidate_id == cid).delete(
+                synchronize_session=False
+            )
             c = db.query(Candidate).filter(Candidate.id == cid).first()
             if c:
                 db.delete(c)
@@ -278,3 +289,278 @@ def test_personality_and_values_persist_for_candidate():
 def test_admin_impact_ok():
     res = client.get("/admin/impact")
     assert res.status_code == 200
+
+
+def test_health_endpoints():
+    for prefix, expected in [("/auth/health", "auth ok"), ("/candidate/health", "candidate ok"), ("/recruiter/health", "recruiter ok")]:
+        res = client.get(prefix)
+        assert res.status_code == 200
+        assert res.json()["status"] == expected
+
+
+def test_get_db_generator_closes_session():
+    import pytest
+
+    gen = db_session.get_db()
+    db = next(gen)
+    assert db is not None
+    with pytest.raises(StopIteration):
+        next(gen)
+
+
+def test_list_candidates_and_jobs():
+    db = SessionLocal()
+    try:
+        c = _new_candidate(db)
+        j = _new_job(db, company="ACME", location="Bern")
+        cid, jid = c.id, j.id
+    finally:
+        db.close()
+
+    try:
+        res = client.get("/api/candidates")
+        assert res.status_code == 200
+        found = [c for c in res.json() if c["id"] == cid]
+        assert len(found) == 1
+        assert found[0]["name"] == "Test Candidate"
+
+        res = client.get("/api/jobs")
+        assert res.status_code == 200
+        found = [j for j in res.json() if j["id"] == jid]
+        assert len(found) == 1
+        assert found[0]["company"] == "ACME"
+        assert found[0]["employment_percentage_min"] == found[0]["employment_percentage_max"]
+    finally:
+        _cleanup(ids=[cid], job_ids=[jid])
+
+
+def test_get_job_fields_and_404():
+    db = SessionLocal()
+    try:
+        j = _new_job(db, company="ACME", salary_min=90000, salary_max=120000)
+        j.title = "Backend"
+        db.commit()
+        jid = j.id
+    finally:
+        db.close()
+
+    try:
+        res = client.get(f"/api/jobs/{jid}")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["title"] == "Backend"
+        assert body["salary_min"] == 90000
+        assert body["salary_max"] == 120000
+        assert body["employment_percentage_min"] == body["employment_percentage_max"]
+        assert body["remote_percentage"] == 0
+        assert body["required_skills"] is None
+
+        res = client.get("/api/jobs/9999999")
+        assert res.status_code == 404
+    finally:
+        _cleanup(job_ids=[jid])
+
+
+def test_match_get_is_read_only_post_writes_log():
+    db = SessionLocal()
+    try:
+        c = _new_candidate(db, location="Zurich")
+        c.experiences.append(Experience(company="A", job_title="Dev", start_date=date(2019, 1, 1), end_date=date(2023, 6, 30)))
+        c.salary_min = 90000
+        c.salary_max = 120000
+        j = _new_job(db, company="ACME", location="Zurich", salary_min=90000, salary_max=120000)
+        j.title = "Dev"
+        db.commit()
+        cid, jid = c.id, j.id
+    finally:
+        db.close()
+
+    try:
+        res = client.get(f"/api/matching/candidate/{cid}/job/{jid}")
+        assert res.status_code == 200
+        assert "overall_score" in res.json()
+
+        db = SessionLocal()
+        try:
+            assert db.query(MatchingLog).filter(MatchingLog.candidate_id == cid, MatchingLog.job_id == jid).count() == 0
+        finally:
+            db.close()
+
+        res = client.post(f"/api/matching/candidate/{cid}/job/{jid}")
+        assert res.status_code == 200
+
+        db = SessionLocal()
+        try:
+            assert db.query(MatchingLog).filter(MatchingLog.candidate_id == cid, MatchingLog.job_id == jid).count() == 1
+        finally:
+            db.close()
+    finally:
+        _cleanup(ids=[cid], job_ids=[jid])
+
+
+def test_match_404_for_missing_candidate_or_job():
+    db = SessionLocal()
+    try:
+        j = _new_job(db)
+        jid = j.id
+    finally:
+        db.close()
+    try:
+        res = client.get(f"/api/matching/candidate/9999999/job/{jid}")
+        assert res.status_code == 404
+        res = client.post(f"/api/matching/candidate/9999999/job/{jid}")
+        assert res.status_code == 404
+        res = client.get(f"/api/matching/candidate/9999999")
+        assert res.status_code == 404
+        res = client.get("/api/matching/job/9999999")
+        assert res.status_code == 404
+    finally:
+        _cleanup(job_ids=[jid])
+
+
+def test_match_candidate_all_ranked():
+    db = SessionLocal()
+    try:
+        c = _new_candidate(db, location="Zurich")
+        c.experiences.append(Experience(company="A", job_title="Dev", start_date=date(2019, 1, 1), end_date=date(2023, 6, 30)))
+        j1 = _new_job(db, company="ACME", location="Zurich")
+        j1.title = "Dev"
+        j2 = _new_job(db, company="Other", location="Geneva")
+        j2.title = "Sales PM"
+        db.commit()
+        cid, j1id, j2id = c.id, j1.id, j2.id
+    finally:
+        db.close()
+    try:
+        res = client.get(f"/api/matching/candidate/{cid}")
+        assert res.status_code == 200
+        body = res.json()
+        assert len(body) >= 1
+        scores = [r["overall_score"] for r in body]
+        assert scores == sorted(scores, reverse=True)
+    finally:
+        _cleanup(ids=[cid], job_ids=[j1id, j2id])
+
+
+def test_match_job_all_ranked():
+    db = SessionLocal()
+    try:
+        j = _new_job(db, company="ACME", location="Zurich")
+        j.title = "Dev"
+        c1 = _new_candidate(db, location="Zurich")
+        c2 = _new_candidate(db, location="Geneva")
+        jid, c1id, c2id = j.id, c1.id, c2.id
+        db.commit()
+    finally:
+        db.close()
+    try:
+        res = client.get(f"/api/matching/job/{jid}")
+        assert res.status_code == 200
+        body = res.json()
+        assert len(body) >= 1
+        scores = [r["overall_score"] for r in body]
+        assert scores == sorted(scores, reverse=True)
+    finally:
+        _cleanup(ids=[c1id, c2id], job_ids=[jid])
+
+
+def test_assessment_questions_endpoint():
+    res = client.get("/api/assessment/questions")
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["personality_questions"]) == 40
+    assert len(body["value_questions"]) == 13
+    assert len(body["personality_dimensions"]) == 4
+    assert len(body["company_values"]) == 14
+
+
+def test_assessment_404s_for_unknown_candidate():
+    res = client.post("/api/assessment/personality", json={"candidate_id": 9999999, "responses": {"mind_1": 5}})
+    assert res.status_code == 404
+
+    res = client.post("/api/assessment/values", json={"candidate_id": 9999999, "responses": {"value_1": 5}})
+    assert res.status_code == 404
+
+
+def test_profile_endpoints_404_for_unknown_candidate():
+    res = client.post("/api/profile/extract", json={"candidate_id": 9999999, "cv_text": "Test CV"})
+    assert res.status_code == 404
+
+    res = client.post(
+        "/api/profile/candidate/9999999/review",
+        json={"candidate_id": 9999999, "profile": {"name": "Nope"}},
+    )
+    assert res.status_code == 404
+
+
+def test_update_preferences_full_field_set():
+    db = SessionLocal()
+    try:
+        c = _new_candidate(db)
+        cid = c.id
+    finally:
+        db.close()
+    try:
+        payload = {
+            "preference_tiers": {"employment_percentage": {"ideal": [100, 100]}},
+            "salary_min": 70000,
+            "salary_max": 95000,
+            "remote_preference": "hybrid",
+            "employment_percentage": 100,
+        }
+        res = client.put(f"/api/candidates/{cid}/preferences", json=payload)
+        assert res.status_code == 200
+        body = res.json()
+        assert body["preference_tiers"]["employment_percentage"]["ideal"] == [100, 100]
+        assert body["salary_max"] == 95000
+        assert body["remote_preference"] == "hybrid"
+    finally:
+        _cleanup(ids=[cid])
+
+
+def test_job_values_update_with_personality_preferences():
+    db = SessionLocal()
+    try:
+        j = _new_job(db)
+        jid = j.id
+    finally:
+        db.close()
+    try:
+        res = client.post(
+            f"/api/assessment/job/{jid}/values",
+            json={"company_values": ["excellence"], "personality_preferences": {"nature": {"pole": "right", "importance": 1}}},
+        )
+        assert res.status_code == 200
+        body = res.json()
+        assert body["company_values"] == ["excellence"]
+        assert body["personality_preferences"]["nature"]["pole"] == "right"
+    finally:
+        _cleanup(job_ids=[jid])
+
+
+def test_workflow_get_returns_agent_history():
+    db = SessionLocal()
+    try:
+        wf = Workflow(
+            workflow_id="aaaa0000-0000-0000-0000-00000000001",
+            candidate_id=1,
+            job_id=1,
+            state="RUNNING",
+        )
+        db.add(wf)
+        db.flush()
+        db.add(AgentLog(workflow_id=wf.workflow_id, agent="ProfileAgent", status="completed"))
+        db.commit()
+        wid = wf.workflow_id
+    finally:
+        db.close()
+    try:
+        res = client.get(f"/api/workflows/{wid}")
+        assert res.status_code == 200
+        history = res.json()["agent_history"]
+        assert len(history) == 1
+        assert history[0]["agent"] == "ProfileAgent"
+        assert history[0]["status"] == "completed"
+        assert history[0]["estimated_cost"] == 0.0
+    finally:
+        _cleanup(workflow_ids=[wid])
