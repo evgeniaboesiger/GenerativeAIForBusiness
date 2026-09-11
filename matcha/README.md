@@ -1,6 +1,6 @@
 ﻿# MATCHA - Swiss Employment Matching Platform
 
-A university proof-of-concept demonstrating AI-powered job matching for women job seekers in Switzerland.
+A university proof-of-concept demonstrating AI-powered job matching for job seekers in Switzerland.
 
 > **No technical background needed.** This guide walks you through everything in plain language.
 
