@@ -214,7 +214,7 @@ def show_auth_page():
     """Login / registration page shown when the user is not signed in."""
     st.title(tr("🤝 Welcome to MATCHA", "🤝 Willkommen bei MATCHA"))
     st.markdown(
-        tr("The Swiss employment-matching platform helping women find suitable jobs faster.",
+        tr("The Swiss employment-matching platform helping find suitable jobs faster.",
            "Die Schweizer Job-Matching-Plattform, die Frauen hilft, schneller passende Stellen zu finden.")
     )
     st.markdown("---")
